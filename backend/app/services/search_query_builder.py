@@ -1,0 +1,45 @@
+from app.services.document_service import get_confirmed_facts
+
+
+def build_external_event_queries(case_id: str, watch_profile: dict) -> list[dict]:
+    facts = get_confirmed_facts(case_id)
+    vessel = _value(facts.get("vessel") or watch_profile.get("watched_vessel"))
+    ports = [port for port in watch_profile.get("watched_ports", []) if port and port != "TBD"]
+    regions = [region for region in watch_profile.get("watched_route_regions", []) if region]
+    queries: list[dict] = []
+
+    def add(query_text: str, query_type: str, priority: str, created_from: list[str], source_hint: str = "news") -> None:
+        queries.append({
+            "query_id": f"Q-{len(queries) + 1:03d}",
+            "query_text": query_text,
+            "query_type": query_type,
+            "priority": priority,
+            "source_hint": source_hint,
+            "created_from": created_from,
+        })
+
+    if vessel and vessel != "TBD":
+        add(f"{vessel} vessel delay OR schedule OR port call", "VESSEL", "HIGH", ["vessel"])
+
+    if len(ports) >= 2:
+        add(f"{ports[1]} port strike OR congestion OR disruption", "PORT", "HIGH", ["port_of_discharge"])
+    elif ports:
+        add(f"{ports[0]} port strike OR congestion OR disruption", "PORT", "HIGH", ["watched_ports"])
+
+    if ports:
+        add(f"{ports[0]} port delay OR congestion", "PORT", "MEDIUM", ["port_of_loading"])
+
+    for region in regions[:2]:
+        add(f"{region} storm OR typhoon OR shipping disruption", "WEATHER_REGION", "MEDIUM", ["route_region"], "weather")
+        add(f"{region} security OR conflict OR route disruption", "GEOPOLITICAL", "MEDIUM", ["route_region"], "news")
+
+    if ports:
+        destination = ports[-1]
+        add(f"{destination} customs OR inland transport OR policy disruption", "TRADE_POLICY", "LOW", ["final_destination"])
+
+    add("global shipping delay port disruption customs", "GENERAL_SHIPPING", "LOW", ["fallback"], "news")
+    return queries
+
+
+def _value(value) -> str:
+    return str(value or "").strip()

@@ -1,0 +1,23 @@
+from app.services.action_board_service import generate_actions
+from app.services.case_service import get_case, get_timeline, set_monitoring_outputs
+from app.services.mock_event_service import get_mock_events
+from app.services.relevance_engine import classify_events
+from app.services.risk_mapper import summarize_exposures
+
+
+def run_monitoring_cycle(case_id: str) -> dict:
+    case = get_case(case_id)
+    events = get_mock_events()
+    relevance_results = classify_events(case, events)
+    risk_summary = summarize_exposures(case, events, relevance_results)
+    actions = generate_actions(risk_summary)
+    set_monitoring_outputs(case_id, relevance_results, risk_summary, actions)
+
+    return {
+        "case": get_case(case_id),
+        "events": events,
+        "relevance_results": relevance_results,
+        "risk_summary": risk_summary,
+        "actions": actions,
+        "status_timeline": get_timeline(case_id),
+    }

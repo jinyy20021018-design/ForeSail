@@ -1,0 +1,120 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.services.case_service import (
+    continue_monitoring,
+    create_case,
+    create_demo_case,
+    get_actions,
+    get_case,
+    get_relevance_results,
+    get_risk_summary,
+    get_timeline,
+    get_watch_profile,
+    update_case_details,
+)
+from app.services.case_library_service import list_case_summaries
+from app.services.document_service import seed_demo_documents
+
+router = APIRouter(prefix="/api/cases", tags=["cases"])
+
+
+class UploadPayload(BaseModel):
+    file_names: list[str] = []
+
+
+class CreateCasePayload(BaseModel):
+    case_name: str | None = None
+    buyer: str | None = None
+    seller: str | None = None
+    commodity: str | None = None
+    port_of_loading: str | None = None
+    port_of_discharge: str | None = None
+    final_destination: str | None = None
+    owner: str | None = None
+    notes: str | None = None
+
+
+class UpdateCaseDetailsPayload(CreateCasePayload):
+    pass
+
+
+@router.get("")
+def list_cases() -> dict:
+    return {"cases": list_case_summaries()}
+
+
+@router.post("")
+def create_new_case(payload: CreateCasePayload) -> dict:
+    return create_case(payload.model_dump(exclude_none=True))
+
+
+@router.post("/demo")
+def create_demo() -> dict:
+    return create_demo_case()
+
+
+@router.post("/demo/clean")
+def create_clean_demo() -> dict:
+    case = create_demo_case()
+    seed_demo_documents(case["case_id"], conflict=False)
+    return case
+
+
+@router.post("/demo/conflict")
+def create_conflict_demo() -> dict:
+    case = create_demo_case()
+    seed_demo_documents(case["case_id"], conflict=True)
+    return case
+
+
+@router.post("/upload")
+def upload_case(payload: UploadPayload) -> dict:
+    return create_demo_case(uploaded_files=payload.file_names)
+
+
+@router.get("/{case_id}")
+def read_case(case_id: str) -> dict:
+    return _or_404(lambda: get_case(case_id), case_id)
+
+
+@router.post("/{case_id}/details")
+def update_case_detail_fields(case_id: str, payload: UpdateCaseDetailsPayload) -> dict:
+    return _or_404(lambda: update_case_details(case_id, payload.model_dump(exclude_none=True)), case_id)
+
+
+@router.get("/{case_id}/watch-profile")
+def read_watch_profile(case_id: str) -> dict:
+    return _or_404(lambda: get_watch_profile(case_id), case_id)
+
+
+@router.get("/{case_id}/relevance-results")
+def read_relevance_results(case_id: str) -> list[dict]:
+    return _or_404(lambda: get_relevance_results(case_id), case_id)
+
+
+@router.get("/{case_id}/risk-summary")
+def read_risk_summary(case_id: str) -> dict:
+    return _or_404(lambda: get_risk_summary(case_id), case_id)
+
+
+@router.get("/{case_id}/actions")
+def read_actions(case_id: str) -> list[dict]:
+    return _or_404(lambda: get_actions(case_id), case_id)
+
+
+@router.get("/{case_id}/status-timeline")
+def read_status_timeline(case_id: str) -> list[dict]:
+    return _or_404(lambda: get_timeline(case_id), case_id)
+
+
+@router.post("/{case_id}/continue-monitoring")
+def continue_case_monitoring(case_id: str) -> dict:
+    return _or_404(lambda: continue_monitoring(case_id), case_id)
+
+
+def _or_404(factory, case_id: str):
+    try:
+        return factory()
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}") from None

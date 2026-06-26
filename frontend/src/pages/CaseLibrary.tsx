@@ -1,0 +1,283 @@
+import { useEffect, useMemo, useState } from "react";
+import { api, type CaseSummary, type TradeCase } from "../api/client";
+import { CaseStatusBadge, RiskBadge } from "../components/Badges";
+
+type Props = {
+  caseIds: string[];
+  onNavigate: (path: string) => void;
+  onRegisterCase: (tradeCase: TradeCase) => void;
+};
+
+export function CaseLibrary({ caseIds, onNavigate, onRegisterCase }: Props) {
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("ALL");
+  const [risk, setRisk] = useState("ALL");
+  const [owner, setOwner] = useState("ALL");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fallbackWarning, setFallbackWarning] = useState<string | null>(null);
+
+  async function loadCases() {
+    setIsLoading(true);
+    setError(null);
+    setFallbackWarning(null);
+    try {
+      const response = await api.listCases();
+      setCases(response.cases);
+    } catch {
+      setFallbackWarning("Using local fallback case list because backend case library API is unavailable.");
+      try {
+        setCases(await loadFallbackCases(caseIds));
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Failed to load cases.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadCases();
+  }, [caseIds.join("|")]);
+
+  async function createDemo(kind: "clean" | "conflict") {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const tradeCase = kind === "clean" ? await api.createCleanDemoCase() : await api.createConflictDemoCase();
+      onRegisterCase(tradeCase);
+      const response = await api.listCases().catch(() => null);
+      if (response) {
+        setCases(response.cases);
+      }
+      onNavigate(`/cases/${tradeCase.case_id}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to create demo case.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const filteredCases = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return cases.filter((caseSummary) => {
+      const riskLevel = caseSummary.risk_level || "Low";
+      const ownerName = caseSummary.owner || "Trade Ops";
+      const haystack = [
+        caseSummary.case_id,
+        caseSummary.vessel,
+        caseSummary.route,
+        caseSummary.port_of_loading,
+        caseSummary.port_of_discharge,
+        caseSummary.final_destination,
+        ownerName,
+      ].join(" ").toLowerCase();
+      return (
+        (!normalizedQuery || haystack.includes(normalizedQuery)) &&
+        (status === "ALL" || caseSummary.status === status) &&
+        (risk === "ALL" || riskLevel === risk) &&
+        (owner === "ALL" || ownerName === owner)
+      );
+    });
+  }, [cases, owner, query, risk, status]);
+
+  const summary = useMemo(() => {
+    const actionRequired = cases.filter((item) => item.status === "ACTION_REQUIRED").length;
+    const atRisk = cases.filter((item) => item.risk_level === "High" || item.status === "AT_RISK" || item.status === "ACTION_REQUIRED").length;
+    const gaps = cases.reduce((total, item) => total + (item.information_gaps_count ?? 0), 0);
+    const deadlines = cases.filter((item) => isWithinSevenDays(item.next_deadline?.date)).length;
+    return [
+      { label: "Total Cases", count: cases.length, description: "All tracked trade cases", tone: "blue" },
+      { label: "At Risk", count: atRisk, description: "Cases with material exposure", tone: "red" },
+      { label: "Action Required", count: actionRequired, description: "Needs user decision", tone: "orange" },
+      { label: "Deadlines in 7 Days", count: deadlines, description: "Upcoming shipment dates", tone: "amber" },
+      { label: "Open Information Gaps", count: gaps, description: "Missing decision inputs", tone: "purple" }
+    ];
+  }, [cases]);
+
+  return (
+    <section className="page">
+      <div className="page-header">
+        <div>
+          <h1>Case Library</h1>
+          <p>Monitor all trade cases and take action on risks.</p>
+        </div>
+        <div className="header-actions">
+          <button className="secondary-action" type="button" onClick={loadCases} disabled={isLoading}>Refresh</button>
+          <button className="primary-action" type="button" onClick={() => onNavigate("/cases/new")}>Create New Case</button>
+        </div>
+      </div>
+
+      {fallbackWarning && <div className="warning-banner">{fallbackWarning}</div>}
+      {error && <div className="error">{error}</div>}
+
+      <div className="summary-card-grid">
+        {summary.map((item) => (
+          <article className="summary-card" key={item.label}>
+            <span className={`summary-icon ${item.tone}`}>{item.label.slice(0, 2)}</span>
+            <div>
+              <small>{item.label}</small>
+              <strong>{item.count}</strong>
+              <p>{item.description}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="filter-bar">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cases by Case ID, vessel, route, or customer..." />
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="ALL">All Status</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="WATCHING">WATCHING</option>
+          <option value="AT_RISK">AT_RISK</option>
+          <option value="ACTION_REQUIRED">ACTION_REQUIRED</option>
+          <option value="MONITORING">MONITORING</option>
+        </select>
+        <select value={risk} onChange={(event) => setRisk(event.target.value)}>
+          <option value="ALL">All Risk</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <select value={owner} onChange={(event) => setOwner(event.target.value)}>
+          <option value="ALL">All Owners</option>
+          <option value="Trade Ops">Trade Ops</option>
+          <option value="Jenny Li">Jenny Li</option>
+          <option value="Michael Wong">Michael Wong</option>
+        </select>
+      </div>
+
+      <section className="panel table-panel">
+        <div className="panel-heading">
+          <h2>Cases</h2>
+          <div className="inline-actions">
+            <button type="button" onClick={() => createDemo("clean")} disabled={isLoading}>Clean Demo</button>
+            <button type="button" onClick={() => createDemo("conflict")} disabled={isLoading}>Conflict Demo</button>
+          </div>
+        </div>
+        {isLoading ? <p className="empty-state">Loading cases...</p> : filteredCases.length === 0 ? (
+          <div className="empty-block">
+            <h3>No cases yet</h3>
+            <p>Create a clean or conflict demo case to start the MVP workflow.</p>
+            <button className="primary-action" type="button" onClick={() => onNavigate("/cases/new")}>Create New Case</button>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="case-table">
+              <thead>
+                <tr>
+                  <th>Case ID</th>
+                  <th>Shipment / Vessel</th>
+                  <th>Route</th>
+                  <th>Status</th>
+                  <th>Risk Level</th>
+                  <th>Next Deadline</th>
+                  <th>Open Actions</th>
+                  <th>Info Gaps</th>
+                  <th>Conflicts</th>
+                  <th>Last Agent Run</th>
+                  <th>Owner</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCases.map((caseSummary) => (
+                  <tr key={caseSummary.case_id}>
+                    <td><button className="link-button" type="button" onClick={() => onNavigate(`/cases/${caseSummary.case_id}`)}>{caseSummary.case_id}</button></td>
+                    <td><strong>{caseSummary.vessel || "Unknown Vessel"}</strong><small>Trade shipment</small></td>
+                    <td><strong>{caseSummary.route || "Route unavailable"}</strong><small>{routePorts(caseSummary)}</small></td>
+                    <td><CaseStatusBadge value={caseSummary.status || "DRAFT"} /></td>
+                    <td><RiskBadge value={caseSummary.risk_level || "Low"} /></td>
+                    <td>{deadlineCell(caseSummary)}</td>
+                    <td><b>{caseSummary.open_actions_count ?? 0}</b><small>Open</small></td>
+                    <td><b>{caseSummary.information_gaps_count ?? 0}</b><small>Open</small></td>
+                    <td>{conflictCell(caseSummary)}</td>
+                    <td>{agentRunCell(caseSummary)}</td>
+                    <td>{caseSummary.owner || "Trade Ops"}</td>
+                    <td><button className="secondary-action compact-button" type="button" onClick={() => onNavigate(`/cases/${caseSummary.case_id}`)}>Open Case</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
+
+async function loadFallbackCases(caseIds: string[]): Promise<CaseSummary[]> {
+  return Promise.all(
+    caseIds.map(async (caseId) => {
+      const [tradeCase, actions, gaps, runs, conflicts] = await Promise.all([
+        api.getCase(caseId),
+        api.getActions(caseId).catch(() => []),
+        api.getInformationGaps(caseId).catch(() => []),
+        api.getAgentRuns(caseId).catch(() => []),
+        api.getFieldConflicts(caseId).catch(() => [])
+      ]);
+      const openConflicts = conflicts.filter((conflict) => conflict.status === "OPEN");
+      const highConflicts = openConflicts.filter((conflict) => conflict.severity === "High");
+      const latestRun = runs[runs.length - 1];
+      return {
+        case_id: tradeCase.case_id,
+        vessel: tradeCase.vessel,
+        route: tradeCase.route,
+        port_of_loading: tradeCase.port_of_loading,
+        port_of_discharge: tradeCase.port_of_discharge,
+        final_destination: tradeCase.final_destination,
+        status: tradeCase.status,
+        risk_level: highConflicts.length > 0 ? "High" : inferRiskLevel(tradeCase.status, gaps.length),
+        next_deadline: tradeCase.latest_shipment_date ? { label: "Latest shipment", date: tradeCase.latest_shipment_date } : null,
+        open_actions_count: actions.length,
+        information_gaps_count: gaps.length,
+        open_conflicts_count: openConflicts.length,
+        high_conflicts_count: highConflicts.length,
+        last_agent_run_at: latestRun?.completed_at || latestRun?.started_at || null,
+        last_agent_run_id: latestRun?.agent_run_id || null,
+        owner: "Trade Ops",
+        updated_at: null,
+      };
+    })
+  );
+}
+
+function inferRiskLevel(statusValue: string | null | undefined, gapsCount: number) {
+  if (statusValue === "ACTION_REQUIRED" || statusValue === "AT_RISK") return "High";
+  if (gapsCount > 0) return "Medium";
+  return "Low";
+}
+
+function isWithinSevenDays(value: string | null | undefined) {
+  if (!value) return false;
+  const deadline = new Date(value);
+  if (Number.isNaN(deadline.getTime())) return false;
+  const now = new Date();
+  const diff = deadline.getTime() - now.getTime();
+  return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+}
+
+function routePorts(caseSummary: CaseSummary) {
+  return [caseSummary.port_of_loading, caseSummary.port_of_discharge, caseSummary.final_destination].filter(Boolean).join(" / ");
+}
+
+function deadlineCell(caseSummary: CaseSummary) {
+  if (!caseSummary.next_deadline) return <span className="muted">No deadline</span>;
+  return <><strong>{caseSummary.next_deadline.label}</strong><b>{caseSummary.next_deadline.date}</b></>;
+}
+
+function conflictCell(caseSummary: CaseSummary) {
+  const high = caseSummary.high_conflicts_count ?? 0;
+  const open = caseSummary.open_conflicts_count ?? 0;
+  if (high > 0) {
+    return <><RiskBadge value="High" /><small>High: {high} / Open: {open}</small></>;
+  }
+  return <><b>High: {high}</b><small>Open: {open}</small></>;
+}
+
+function agentRunCell(caseSummary: CaseSummary) {
+  if (!caseSummary.last_agent_run_id) return <span className="muted">No run yet</span>;
+  return <><strong>{caseSummary.last_agent_run_at || "Completed"}</strong><small>{caseSummary.last_agent_run_id}</small></>;
+}
