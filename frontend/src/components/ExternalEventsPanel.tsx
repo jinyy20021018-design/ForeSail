@@ -96,6 +96,7 @@ export function ExternalEventsPanel({
             <div><dt>GDELT Lookback</dt><dd>{config?.gdelt_lookback_days ?? 7} days</dd></div>
             <div><dt>GDELT Max Records</dt><dd>{config?.gdelt_max_records ?? 10}</dd></div>
             <div><dt>Query Limit</dt><dd>{config?.external_event_query_limit ?? 3}</dd></div>
+            <div><dt>Weather Location Limit</dt><dd>{config?.real_event_location_limit ?? config?.external_event_query_limit ?? 3}</dd></div>
             <div><dt>Weather Forecast</dt><dd>{config?.open_meteo_forecast_days ?? 3} days</dd></div>
             <div><dt>LLM Event Extraction</dt><dd>{config?.use_llm_event_extraction ? "Enabled" : "Disabled"}</dd></div>
           </dl>

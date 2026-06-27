@@ -39,6 +39,7 @@ class GdeltEventConnector:
         articles_fetched = 0
         max_total = _int_env("REAL_EVENT_MAX_TOTAL_RESULTS", 30)
         rate_limited = False
+
         for query in queries:
             if len(events) >= max_total:
                 break
@@ -142,6 +143,7 @@ def _summary(queries: list[dict], warnings: list[str], enabled: bool) -> dict:
         "connector_errors": [],
         "warnings": warnings,
         "queries": queries,
+        "rate_limited": False,
     }
 
 

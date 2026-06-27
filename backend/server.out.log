@@ -1,3 +1,0 @@
-INFO:     127.0.0.1:57658 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58179 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61829 - "POST /api/cases/CASE-005/treatment-plans/generate HTTP/1.1" 404 Not Found
