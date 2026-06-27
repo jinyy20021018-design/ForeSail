@@ -85,10 +85,10 @@ export function ExternalEventsPanel({
               <h2>Event Source Mode</h2>
               <p className="subtle">External events are normalized before relevance scoring.</p>
             </div>
-            <span className="tag">Event Mode: {config?.event_source_mode ?? "MOCK"}</span>
+            <span className="tag">Event Mode: {config?.event_source_mode ?? "Loading"}</span>
           </div>
           <dl className="field-grid">
-            <div><dt>Connectors</dt><dd>{(config?.connectors ?? ["mock_event_connector"]).join(", ")}</dd></div>
+            <div><dt>Connectors</dt><dd>{config?.connectors?.length ? config.connectors.join(", ") : "Loading"}</dd></div>
             <div><dt>Last Fetch</dt><dd>{lastResult ? `${lastResult.fetched} events / ${lastResult.errors} errors` : "Not fetched in this session"}</dd></div>
             <div><dt>GDELT</dt><dd>{config?.gdelt_enabled ? "Enabled" : "Disabled"}</dd></div>
             <div><dt>Open-Meteo</dt><dd>{config?.open_meteo_enabled ? "Enabled" : "Disabled"}</dd></div>

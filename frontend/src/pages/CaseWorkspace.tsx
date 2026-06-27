@@ -62,6 +62,32 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "audit", label: "Audit" }
 ];
 
+const confirmRequiredFields = [
+  "vessel",
+  "port_of_loading",
+  "port_of_discharge",
+  "etd",
+  "eta",
+  "latest_shipment_date",
+  "payment_method",
+  "incoterm",
+  "amount",
+  "currency",
+];
+
+const fieldLabels: Record<string, string> = {
+  vessel: "Vessel",
+  port_of_loading: "Port of Loading",
+  port_of_discharge: "Port of Discharge",
+  etd: "ETD",
+  eta: "ETA",
+  latest_shipment_date: "Latest Shipment Date",
+  payment_method: "Payment Method",
+  incoterm: "Incoterm",
+  amount: "Amount",
+  currency: "Currency",
+};
+
 export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Props) {
   const [tradeCase, setTradeCase] = useState<TradeCase | null>(null);
   const [watchProfile, setWatchProfile] = useState<WatchProfile | null>(null);
@@ -92,6 +118,18 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     () => conflicts.filter((conflict) => conflict.severity === "High" && conflict.status === "OPEN"),
     [conflicts]
   );
+  const missingConfirmFields = useMemo(() => {
+    const confirmedFieldNames = new Set(
+      fields
+        .filter((field) => field.review_status === "APPROVED" || field.review_status === "EDITED")
+        .filter((field) => {
+          const value = field.review_status === "EDITED" ? field.edited_value : field.value;
+          return value !== null && value !== "";
+        })
+        .map((field) => field.field_name)
+    );
+    return confirmRequiredFields.filter((field) => !confirmedFieldNames.has(field));
+  }, [fields]);
 
   async function refreshCase() {
     setError(null);
@@ -206,7 +244,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   }, [caseId]);
 
   async function confirmFields() {
-    if (fields.length === 0 || highOpenConflicts.length > 0) return;
+    if (fields.length === 0 || highOpenConflicts.length > 0 || missingConfirmFields.length > 0) return;
     setError(null);
     try {
       const facts = await api.confirmFields(caseId);
@@ -292,7 +330,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           <div className="title-row">
             <h1>{tradeCase.vessel} Trade Watch</h1>
           <CaseStatusBadge value={tradeCase.status} />
-            <span className="tag">Event Mode: {eventConfig?.event_source_mode ?? "MOCK"}</span>
+            <span className="tag">Event Mode: {eventConfig?.event_source_mode ?? "Loading"}</span>
           </div>
           <p>Case Workspace for {tradeCase.route}</p>
           {highOpenConflicts.length > 0 && (
@@ -356,7 +394,18 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
             onError={setError}
             language={language}
           />
-          <button className="primary-action section-action" type="button" onClick={confirmFields} disabled={fields.length === 0 || highOpenConflicts.length > 0}>
+          {missingConfirmFields.length > 0 && (
+            <div className="warning-banner">
+              Confirm Case Facts requires: {missingConfirmFields.map((field) => fieldLabels[field] ?? field).join(", ")}. Upload the missing document(s) or edit extracted fields before confirming.
+            </div>
+          )}
+          <button
+            className="primary-action section-action"
+            type="button"
+            onClick={confirmFields}
+            disabled={fields.length === 0 || highOpenConflicts.length > 0 || missingConfirmFields.length > 0}
+            title={missingConfirmFields.length > 0 ? `Missing required fields: ${missingConfirmFields.map((field) => fieldLabels[field] ?? field).join(", ")}` : undefined}
+          >
             Confirm Fields
           </button>
         </>

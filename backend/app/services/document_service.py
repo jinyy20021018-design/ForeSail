@@ -411,12 +411,6 @@ def detect_field_conflicts(case_id: str) -> list[dict]:
     incoterm_values = values_for("incoterm")
     add_conflict("incoterm", "Medium", incoterm_values, "The Incoterm extracted across trade documents differs.", "User should confirm the operative Incoterm.")
 
-    eta_values = values_for("eta")
-    if eta_values:
-        event_eta = {"value": "2026-12-13", "source_document_name": "mock_event_feed", "source_document_type": "EVENT", "field_id": "EVT-001"}
-        booking_values = eta_values + [event_eta]
-        add_conflict("eta", "Medium", booking_values, "Booking ETA differs from event-updated ETA by at least 3 days.", "User should confirm updated ETA with carrier.")
-
     previous = {conflict["conflict_id"]: conflict for conflict in _field_conflicts.get(case_id, [])}
     for conflict in conflicts:
         old = previous.get(conflict["conflict_id"])
@@ -550,6 +544,7 @@ def extract_fields_from_document(case_id: str, document: dict, raw_text: str, di
         field_names = [
             "commodity",
             "quantity",
+            "quantity_unit",
             "amount",
             "currency",
             "buyer",
@@ -590,6 +585,8 @@ def fallback_demo_fields(case_id: str, documents: list[dict]) -> list[dict]:
         "presentation_period_days": 21,
         "payment_method": "LC at sight",
         "incoterm": "CIF",
+        "quantity": 100,
+        "quantity_unit": "MT",
         "amount": 1250000,
         "currency": "USD",
         "booking_reference": None,
@@ -646,6 +643,8 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         "buyer",
         "seller",
         "commodity",
+        "quantity",
+        "quantity_unit",
         "amount",
         "currency",
         "incoterm",
@@ -665,6 +664,10 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         "Extract trade document fields as strict JSON. Return only an object with a fields array. "
         "Each item must contain field_name, value, evidence_text, confidence. "
         f"Allowed field_name values: {', '.join(field_names)}. "
+        "Use amount only for monetary value, and currency only for currency code. "
+        "Use quantity for the numeric cargo quantity and quantity_unit for its unit. "
+        "For example, 'Quantity: 5000 metric tons' must become quantity=5000 and quantity_unit='metric tons', not amount. "
+        "Do not include units in amount. "
         "Do not infer legal conclusions, risk levels, conflicts, approvals, or monitoring decisions.\n\n"
         f"Document type: {document.get('document_type')}\n"
         f"Filename: {document.get('filename')}\n"
@@ -729,6 +732,7 @@ def _extract_value(field_name: str, raw_text: str, document: dict):
         "beneficiary": r"beneficiary[:\s]+([A-Za-z0-9 .,&-]+)",
         "commodity": r"commodity[:\s]+([A-Za-z0-9 .,&-]+)",
         "quantity": r"quantity[:\s]+([A-Za-z0-9 .,&-]+)",
+        "quantity_unit": r"quantity[:\s]+[0-9,]+(?:\.[0-9]+)?\s*([A-Za-z][A-Za-z .,&-]*)",
         "buyer": r"buyer[:\s]+([A-Za-z0-9 .,&-]+)",
         "seller": r"seller[:\s]+([A-Za-z0-9 .,&-]+)",
     }
@@ -737,6 +741,8 @@ def _extract_value(field_name: str, raw_text: str, document: dict):
         value = match.group(1).strip(" .,\r\n")
         if field_name in {"amount", "presentation_period_days"}:
             return _float_or_int(value)
+        if field_name == "quantity":
+            return _quantity_number(value)
         return _normalize_date(value) if "date" in field_name or field_name in {"etd", "eta"} else value
     return None
 
@@ -755,6 +761,8 @@ def _default_value(field_name: str):
         "presentation_period_days": 21,
         "payment_method": "LC at sight",
         "incoterm": "CIF",
+        "quantity": 100,
+        "quantity_unit": "MT",
         "amount": 1250000,
         "currency": "USD",
         "partial_shipment_allowed": True,
@@ -829,7 +837,20 @@ def _find_field(case_id: str, field_id: str) -> dict:
 def _float_or_int(value):
     if value in {None, ""}:
         return None
-    number = float(str(value).replace(",", ""))
+    try:
+        number = float(str(value).replace(",", ""))
+    except ValueError as error:
+        raise ValueError(f"Invalid numeric amount: {value}") from error
+    return int(number) if number.is_integer() else number
+
+
+def _quantity_number(value):
+    if value in {None, ""}:
+        return None
+    match = re.match(r"^([0-9][0-9,]*(?:\.[0-9]+)?)", str(value).strip())
+    if not match:
+        return value
+    number = float(match.group(1).replace(",", ""))
     return int(number) if number.is_integer() else number
 
 

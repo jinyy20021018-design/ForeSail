@@ -494,7 +494,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let message = `API request failed: ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body?.detail === "string" && body.detail.trim()) {
+        message = body.detail;
+      } else if (typeof body?.message === "string" && body.message.trim()) {
+        message = body.message;
+      }
+    } catch {
+      // Keep the status-only fallback if the response is not JSON.
+    }
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;

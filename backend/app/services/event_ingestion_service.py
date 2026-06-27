@@ -11,8 +11,8 @@ VALID_MODES = {"MOCK", "REAL", "HYBRID"}
 
 
 def event_source_mode() -> str:
-    mode = os.getenv("EVENT_SOURCE_MODE", "MOCK").upper()
-    return mode if mode in VALID_MODES else "MOCK"
+    mode = os.getenv("EVENT_SOURCE_MODE", "REAL").upper()
+    return mode if mode in VALID_MODES else "REAL"
 
 
 def fetch_events_for_case(case_id: str, watch_profile: dict, agent_run_id: str | None = None, persist: bool = False) -> dict:

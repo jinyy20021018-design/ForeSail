@@ -215,7 +215,7 @@ def set_monitoring_outputs(
 
     case = _cases[case_id]
     timeline = _timelines[case_id]
-    transition_case(case, "WATCHING", timeline, "Monitoring started with mock external event feed.")
+    transition_case(case, "WATCHING", timeline, "Monitoring started with configured external event feed.")
 
     if risk_summary["triggered"]:
         transition_case(case, "AT_RISK", timeline, "At least one Relevant event was detected.")
