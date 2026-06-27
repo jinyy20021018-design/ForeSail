@@ -696,7 +696,7 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:
             body = json.loads(response.read().decode("utf-8"))
         content = body["choices"][0]["message"]["content"]
         parsed = json.loads(content)

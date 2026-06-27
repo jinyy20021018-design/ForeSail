@@ -483,7 +483,11 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
             <CifResponsibilityCard responsibility={cifResponsibility} tradeCase={tradeCase} />
             {watchProfile && <WatchProfilePanel profile={watchProfile} language={language} />}
           </div>
-          <RouteRiskMap tradeCase={tradeCase} />
+          <RouteRiskMap
+            caseId={caseId}
+            tradeCase={tradeCase}
+            refreshKey={`${agentRuns.length}:${relevanceResults.length}:${tradeCase.port_of_loading}:${tradeCase.port_of_discharge}:${tradeCase.final_destination}`}
+          />
           <div className="workspace-grid">
             <LatestAgentRunCard runs={agentRuns} result={agentResult} />
             <StatusTimeline entries={timeline} language={language} />
