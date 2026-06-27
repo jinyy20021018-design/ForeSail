@@ -2,7 +2,8 @@ import json
 import os
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+UTC = timezone.utc
 
 
 def extract_event_from_news_item(item: dict, watch_profile: dict) -> dict | None:

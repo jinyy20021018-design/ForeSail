@@ -6,7 +6,8 @@ import shutil
 import urllib.error
 import urllib.request
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+UTC = timezone.utc
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO

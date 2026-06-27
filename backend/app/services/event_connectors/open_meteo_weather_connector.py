@@ -1,7 +1,8 @@
 import os
 import urllib.parse
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+UTC = timezone.utc
 
 from app.services.port_geo_service import resolve_location_coordinates
 from app.services.port_registry_service import resolve_port
