@@ -89,6 +89,37 @@ const fieldLabels: Record<string, string> = {
   currency: "Currency",
 };
 
+const agentProgressSteps = [
+  {
+    title: "Load confirmed case facts",
+    detail: "Reading vessel, route, ports, shipment window, LC deadline, and Incoterm."
+  },
+  {
+    title: "Build watch profile",
+    detail: "Preparing watched vessel, ports, route regions, and deadline sensitivity."
+  },
+  {
+    title: "Fetch real external events",
+    detail: "Calling GDELT and Open-Meteo with the narrowed real-search query window."
+  },
+  {
+    title: "Normalize and deduplicate events",
+    detail: "Converting connector output to normalized events and removing duplicates."
+  },
+  {
+    title: "Classify relevance",
+    detail: "Scoring events against this case with deterministic relevance rules."
+  },
+  {
+    title: "Map obligations, gaps, and actions",
+    detail: "Mapping exposures to deadlines, information gaps, and recommended actions."
+  },
+  {
+    title: "Generate treatment outputs",
+    detail: "Creating treatment plans, residual risk summaries, approval draft, and audit trace."
+  }
+];
+
 export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Props) {
   const [tradeCase, setTradeCase] = useState<TradeCase | null>(null);
   const [watchProfile, setWatchProfile] = useState<WatchProfile | null>(null);
@@ -113,6 +144,8 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTabFromUrl());
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [agentElapsedSeconds, setAgentElapsedSeconds] = useState(0);
+  const [agentProgressStep, setAgentProgressStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const highOpenConflicts = useMemo(
@@ -244,6 +277,21 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       .finally(() => setIsLoading(false));
   }, [caseId]);
 
+  useEffect(() => {
+    if (!isRunning) {
+      setAgentElapsedSeconds(0);
+      setAgentProgressStep(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setAgentElapsedSeconds(elapsed);
+      setAgentProgressStep(Math.min(agentProgressSteps.length - 1, Math.floor(elapsed / 8)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+
   async function confirmFields() {
     if (fields.length === 0 || highOpenConflicts.length > 0 || missingConfirmFields.length > 0) return;
     setError(null);
@@ -262,6 +310,9 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   async function runAgent() {
     if (!hasConfirmedFacts || highOpenConflicts.length > 0) return;
     setIsRunning(true);
+    setAgentElapsedSeconds(0);
+    setAgentProgressStep(0);
+    setActiveTab("agent");
     setError(null);
     try {
       const result = await api.runAgentMonitoringCycle(caseId);
@@ -357,6 +408,13 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       </div>
 
       {error && <div className="error">{error}</div>}
+      {isRunning && (
+        <AgentRunProgressPanel
+          activeStep={agentProgressStep}
+          elapsedSeconds={agentElapsedSeconds}
+          eventConfig={eventConfig}
+        />
+      )}
       <WorkflowStepper workflow={workflow} />
 
       <div className="tabs">
@@ -514,6 +572,44 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 function WorkspaceMetric({ icon, tone, label, value, detail, onClick }: { icon: "shield" | "check" | "info" | "agent"; tone: string; label: string; value: string; detail: string; onClick: () => void }) {
   return <button className="workspace-metric" type="button" onClick={onClick}><span className={`metric-icon ${tone}`}><MetricGlyph name={icon} /></span><span><b>{label}</b><strong>{value}</strong><small>{detail}</small></span><em>View details →</em></button>;
+}
+
+function AgentRunProgressPanel({ activeStep, elapsedSeconds, eventConfig }: { activeStep: number; elapsedSeconds: number; eventConfig: EventConfig | null }) {
+  const mode = eventConfig?.event_source_mode ?? "REAL";
+  const queryLimit = eventConfig?.external_event_query_limit ?? 3;
+  const connectorText = eventConfig?.connectors?.length ? eventConfig.connectors.join(", ") : "configured connectors";
+
+  return (
+    <section className="agent-run-window" aria-live="polite">
+      <div className="agent-run-window-header">
+        <div>
+          <span className="run-live-dot" />
+          <strong>Agent is running</strong>
+          <small>
+            {mode} mode · max {queryLimit} external event queries · {connectorText}
+          </small>
+        </div>
+        <span className="tag">{elapsedSeconds}s elapsed</span>
+      </div>
+      <div className="agent-run-progress">
+        {agentProgressSteps.map((step, index) => {
+          const state = index < activeStep ? "done" : index === activeStep ? "active" : "pending";
+          return (
+            <div className={`agent-run-progress-step ${state}`} key={step.title}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <small>{step.detail}</small>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p>
+        This window shows the current estimated stage while the backend request is running. The final persisted Agent Trace appears after completion.
+      </p>
+    </section>
+  );
 }
 
 function MetricGlyph({ name }: { name: "shield" | "check" | "info" | "agent" }) {

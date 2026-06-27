@@ -166,6 +166,7 @@ export type EventConfig = {
   open_meteo_enabled?: boolean;
   gdelt_lookback_days?: number;
   gdelt_max_records?: number;
+  external_event_query_limit?: number;
   open_meteo_forecast_days?: number;
   real_search_enabled?: boolean;
   real_search_provider?: string;
@@ -219,6 +220,7 @@ export type RealEventConfig = {
   open_meteo_enabled: boolean;
   gdelt_lookback_days: number;
   gdelt_max_records: number;
+  external_event_query_limit?: number;
   open_meteo_forecast_days: number;
   use_llm_event_extraction: boolean;
 };

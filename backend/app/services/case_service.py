@@ -4,7 +4,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.services.status_machine import transition_case
+from app.services.status_machine import can_transition, transition_case
 from app.services.watch_profile_service import build_watch_profile
 from app.services.persistence_service import clear_namespace, list_item_records, load_item, save_item
 
@@ -215,12 +215,13 @@ def set_monitoring_outputs(
 
     case = _cases[case_id]
     timeline = _timelines[case_id]
-    transition_case(case, "WATCHING", timeline, "Monitoring started with configured external event feed.")
+    if can_transition(case["status"], "WATCHING"):
+        transition_case(case, "WATCHING", timeline, "Monitoring started with configured external event feed.")
 
-    if risk_summary["triggered"]:
+    if risk_summary["triggered"] and can_transition(case["status"], "AT_RISK"):
         transition_case(case, "AT_RISK", timeline, "At least one Relevant event was detected.")
 
-    if actions:
+    if actions and can_transition(case["status"], "ACTION_REQUIRED"):
         transition_case(case, "ACTION_REQUIRED", timeline, "Recommended actions were generated for the triggered exposures.")
 
     _results[case_id] = copy.deepcopy(relevance_results)

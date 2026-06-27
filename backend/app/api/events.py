@@ -37,6 +37,7 @@ def read_event_config() -> dict:
         "open_meteo_enabled": os.getenv("OPEN_METEO_ENABLED", "false").lower() == "true",
         "gdelt_lookback_days": _int_env("GDELT_LOOKBACK_DAYS", 7),
         "gdelt_max_records": _int_env("GDELT_MAX_RECORDS", 10),
+        "external_event_query_limit": _int_env("EXTERNAL_EVENT_QUERY_LIMIT", 3),
         "open_meteo_forecast_days": _int_env("OPEN_METEO_FORECAST_DAYS", 3),
         "real_search_enabled": os.getenv("REAL_SEARCH_ENABLED", "false").lower() == "true",
         "real_search_provider": os.getenv("REAL_SEARCH_PROVIDER", "RSS"),
@@ -54,6 +55,7 @@ def read_real_event_config() -> dict:
         "open_meteo_enabled": os.getenv("OPEN_METEO_ENABLED", "false").lower() == "true",
         "gdelt_lookback_days": _int_env("GDELT_LOOKBACK_DAYS", 7),
         "gdelt_max_records": _int_env("GDELT_MAX_RECORDS", 10),
+        "external_event_query_limit": _int_env("EXTERNAL_EVENT_QUERY_LIMIT", 3),
         "open_meteo_forecast_days": _int_env("OPEN_METEO_FORECAST_DAYS", 3),
         "use_llm_event_extraction": os.getenv("USE_LLM_EVENT_EXTRACTION", "false").lower() == "true",
     }
