@@ -25,7 +25,33 @@ def _load_demo_case() -> dict:
 
 def reset_store() -> None:
     clear_runtime_case_cache()
-    for namespace in ["case", "watch_profile", "status_timeline", "relevance_results", "risk_summary", "actions"]:
+    try:
+        from app.services.document_service import clear_runtime_document_cache
+
+        clear_runtime_document_cache()
+    except ImportError:
+        pass
+    for namespace in [
+        "case",
+        "watch_profile",
+        "status_timeline",
+        "relevance_results",
+        "risk_summary",
+        "actions",
+        "documents",
+        "extracted_fields",
+        "confirmed_facts",
+        "obligations",
+        "information_gaps",
+        "action_drafts",
+        "field_conflicts",
+        "agent_run",
+        "agent_trace",
+        "treatment_plan",
+        "residual_risk",
+        "approval_package",
+        "external_event",
+    ]:
         clear_namespace(namespace)
 
 
@@ -41,6 +67,7 @@ def clear_runtime_case_cache() -> None:
 def create_demo_case(uploaded_files: list[str] | None = None) -> dict:
     case = _load_demo_case()
     case["case_id"] = generate_next_case_id()
+    _ensure_case_defaults(case)
     case["uploaded_files"] = uploaded_files or []
     case["case_name"] = "CAPEMOLLINI Shanghai to Dhaka Demo"
     case["buyer"] = "Demo Buyer"
@@ -90,6 +117,8 @@ def create_case(payload: dict) -> dict:
         "latest_shipment_date": payload.get("latest_shipment_date") or "",
         "payment_method": payload.get("payment_method") or "",
         "incoterm": payload.get("incoterm") or "",
+        "incoterm_named_place": payload.get("incoterm_named_place") or "",
+        "trade_perspective": payload.get("trade_perspective") or "SELLER",
         "owner": payload.get("owner") or "Trade Ops",
         "notes": payload.get("notes") or "",
         "created_at": now,
@@ -154,6 +183,7 @@ def get_case(case_id: str) -> dict:
             _cases[case_id] = stored
     if case_id not in _cases:
         raise KeyError(case_id)
+    _ensure_case_defaults(_cases[case_id])
     return copy.deepcopy(_cases[case_id])
 
 
@@ -182,6 +212,7 @@ def replace_case_facts(case_id: str, facts: dict) -> None:
         "latest_shipment_date",
         "payment_method",
         "incoterm",
+        "incoterm_named_place",
         "amount",
         "currency",
     ]:
@@ -190,6 +221,15 @@ def replace_case_facts(case_id: str, facts: dict) -> None:
     case["updated_at"] = _now()
     _profiles[case_id] = build_watch_profile(case)
     _persist_case_bundle(case_id)
+
+
+def set_trade_perspective(case_id: str, perspective: str) -> dict:
+    if case_id not in _cases:
+        get_case(case_id)
+    _cases[case_id]["trade_perspective"] = perspective
+    _cases[case_id]["updated_at"] = _now()
+    _persist_case_bundle(case_id)
+    return get_case(case_id)
 
 
 def get_timeline(case_id: str) -> list[dict]:
@@ -289,3 +329,8 @@ def _persist_case_bundle(case_id: str) -> None:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _ensure_case_defaults(case: dict) -> None:
+    case.setdefault("trade_perspective", "SELLER")
+    case.setdefault("incoterm_named_place", "")

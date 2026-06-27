@@ -10,6 +10,7 @@ ALLOWED_FIELDS = {
     "amount",
     "currency",
     "incoterm",
+    "incoterm_named_place",
     "payment_method",
     "vessel",
     "route",

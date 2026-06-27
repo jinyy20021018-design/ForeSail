@@ -1,5 +1,3 @@
-INFO:     127.0.0.1:55568 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50927 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50929 - "GET /api/cases/CASE-004/external-event-queries HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50927 - "GET /api/events/config HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50939 - "POST /api/cases/CASE-004/agent-run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57658 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58179 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61829 - "POST /api/cases/CASE-005/treatment-plans/generate HTTP/1.1" 404 Not Found

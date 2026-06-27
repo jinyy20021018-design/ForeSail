@@ -91,9 +91,11 @@ export function ExternalEventsPanel({
             <div><dt>Connectors</dt><dd>{config?.connectors?.length ? config.connectors.join(", ") : "Loading"}</dd></div>
             <div><dt>Last Fetch</dt><dd>{lastResult ? `${lastResult.fetched} events / ${lastResult.errors} errors` : "Not fetched in this session"}</dd></div>
             <div><dt>GDELT</dt><dd>{config?.gdelt_enabled ? "Enabled" : "Disabled"}</dd></div>
+            <div><dt>RSS News Fallback</dt><dd>{config?.real_search_enabled ? `Enabled (${config?.configured_feeds_count ?? 0} feeds)` : "Disabled"}</dd></div>
             <div><dt>Open-Meteo</dt><dd>{config?.open_meteo_enabled ? "Enabled" : "Disabled"}</dd></div>
             <div><dt>GDELT Lookback</dt><dd>{config?.gdelt_lookback_days ?? 7} days</dd></div>
             <div><dt>GDELT Max Records</dt><dd>{config?.gdelt_max_records ?? 10}</dd></div>
+            <div><dt>Query Limit</dt><dd>{config?.external_event_query_limit ?? 3}</dd></div>
             <div><dt>Weather Forecast</dt><dd>{config?.open_meteo_forecast_days ?? 3} days</dd></div>
             <div><dt>LLM Event Extraction</dt><dd>{config?.use_llm_event_extraction ? "Enabled" : "Disabled"}</dd></div>
           </dl>
@@ -112,7 +114,7 @@ export function ExternalEventsPanel({
         <section className="panel">
           <div className="panel-heading"><h2>Real Search</h2></div>
           <p className="subtle">
-            Search queries are generated from the confirmed watch profile, then GDELT news and Open-Meteo weather outputs are normalized into external events.
+            Search queries are generated from the confirmed watch profile, then GDELT, RSS news fallback, and Open-Meteo outputs are normalized into external events.
           </p>
           <div className="action-row">
             <button
@@ -138,6 +140,8 @@ export function ExternalEventsPanel({
             <div><strong>{searchResult?.queries_generated?.length ?? 0}</strong><span>Queries</span></div>
             <div><strong>{searchResult?.gdelt_articles_fetched ?? 0}</strong><span>GDELT Articles</span></div>
             <div><strong>{searchResult?.gdelt_events_extracted?.length ?? 0}</strong><span>GDELT Events</span></div>
+            <div><strong>{searchResult?.rss_items_fetched ?? 0}</strong><span>RSS Items</span></div>
+            <div><strong>{searchResult?.rss_items_matched ?? 0}</strong><span>RSS Matched</span></div>
             <div><strong>{searchResult?.weather_locations_checked ?? 0}</strong><span>Weather Locations</span></div>
             <div><strong>{searchResult?.weather_events_extracted?.length ?? 0}</strong><span>Weather Events</span></div>
             <div><strong>{events.length}</strong><span>Stored Events</span></div>

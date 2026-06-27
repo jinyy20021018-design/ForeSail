@@ -1,5 +1,7 @@
 const API_BASE = "http://127.0.0.1:8000";
 
+export type TradePerspective = "BUYER" | "SELLER";
+
 export type TradeCase = {
   case_id: string;
   status: string;
@@ -17,6 +19,8 @@ export type TradeCase = {
   latest_shipment_date: string;
   payment_method: string;
   incoterm: string;
+  incoterm_named_place?: string;
+  trade_perspective?: TradePerspective;
   owner?: string;
   notes?: string;
   created_at?: string;
@@ -229,6 +233,11 @@ export type RiskExposure = {
   category: string;
   impact: string;
   severity: string;
+  party_perspective?: TradePerspective;
+  affected_party?: string;
+  responsible_party?: string;
+  incoterm_basis?: string;
+  cif_scenario?: string;
   evidence_event_ids: string[];
   trigger_event_ids?: string[];
   watch_event_ids?: string[];
@@ -238,6 +247,8 @@ export type RiskSummary = {
   triggered: boolean;
   trigger_events: string[];
   watch_events_considered?: string[];
+  trade_perspective?: TradePerspective;
+  incoterm_basis?: string;
   exposures: RiskExposure[];
 };
 
@@ -249,6 +260,9 @@ export type RecommendedAction = {
   deadline: string;
   status: string;
   related_exposure: string;
+  party_perspective?: TradePerspective;
+  responsible_party?: "BUYER" | "SELLER" | "SHARED" | "UNKNOWN" | string;
+  incoterm_basis?: string;
 };
 
 export type StatusTimelineEntry = {
@@ -346,6 +360,8 @@ export type ResidualRisk = {
   monitoring_trigger: string;
   owner_role: string;
   status: string;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
 };
@@ -374,6 +390,8 @@ export type TreatmentPlan = {
   recheck_triggers: string[];
   rationale: string;
   status: string;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
 };
@@ -396,8 +414,35 @@ export type ApprovalPackage = {
   decision_note: string | null;
   approval_scope?: string;
   conflict_safe_mode?: boolean;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type CifResponsibility = {
+  case_id: string;
+  incoterm: string;
+  incoterm_basis: string;
+  named_destination_port: string;
+  supported: boolean;
+  risk_transfer_point: string;
+  seller_responsibilities: string[];
+  buyer_responsibilities: string[];
+  cost_responsibility: Record<string, string>;
+  warnings: Array<{ code: string; message: string }>;
+};
+
+export type PerspectiveAnalysis = {
+  case_id: string;
+  trade_perspective: TradePerspective;
+  cif_responsibility: CifResponsibility;
+  risk_summary: RiskSummary;
+  obligations: ObligationDeadline[];
+  information_gaps: InformationGap[];
+  actions: RecommendedAction[];
+  treatment_plans: TreatmentPlan[];
+  relevance_results: RelevanceResult[];
 };
 
 export type FieldConflict = {
@@ -549,6 +594,14 @@ export const api = {
     request<ExternalEventSearchResult>(`/api/cases/${caseId}/external-events/search`, { method: "POST" }),
   getRiskSummary: (caseId: string) => request<RiskSummary>(`/api/cases/${caseId}/risk-summary`),
   getActions: (caseId: string) => request<RecommendedAction[]>(`/api/cases/${caseId}/actions`),
+  getCifResponsibility: (caseId: string) => request<CifResponsibility>(`/api/cases/${caseId}/cif-responsibility`),
+  getPerspectiveAnalysis: (caseId: string, perspective: TradePerspective) =>
+    request<PerspectiveAnalysis>(`/api/cases/${caseId}/perspective-analysis?perspective=${perspective}`),
+  updatePerspective: (caseId: string, perspective: TradePerspective) =>
+    request<TradeCase>(`/api/cases/${caseId}/perspective`, {
+      method: "PUT",
+      body: JSON.stringify({ trade_perspective: perspective })
+    }),
   uploadDocument: async (caseId: string, file: File, documentType: string) => {
     const formData = new FormData();
     formData.append("file", file);

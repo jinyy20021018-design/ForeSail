@@ -68,7 +68,7 @@ def _events_from_forecast(location: str, coordinate: dict, forecast: dict) -> li
     precipitation = hourly.get("precipitation") or []
     gusts = hourly.get("wind_gusts_10m") or []
     codes = hourly.get("weather_code") or []
-    events: list[dict] = []
+    candidates: list[dict] = []
     for index, event_time in enumerate(times):
         precip = _value_at(precipitation, index)
         gust = _value_at(gusts, index)
@@ -77,7 +77,7 @@ def _events_from_forecast(location: str, coordinate: dict, forecast: dict) -> li
         if not severity:
             continue
         title = _weather_title(location, reason, severity)
-        events.append({
+        candidates.append({
             "event_id": f"EVT-METEO-{abs(hash((location, event_time, reason))) % 1000000:06d}",
             "source": "open_meteo_weather_connector",
             "source_type": "WEATHER",
@@ -94,11 +94,43 @@ def _events_from_forecast(location: str, coordinate: dict, forecast: dict) -> li
             "severity": severity,
             "confidence": 0.75 if severity == "HIGH" else 0.62,
             "url": None,
-            "raw_payload": {"location": location, "coordinate": coordinate, "precipitation": precip, "wind_gusts_10m": gust, "weather_code": code},
-            "dedup_key": f"OPEN_METEO|WEATHER|{location.lower()}|{event_time}|{reason}",
+            "raw_payload": {"location": location, "coordinate": coordinate, "precipitation": precip, "wind_gusts_10m": gust, "weather_code": code, "reason": reason},
+            "dedup_key": f"OPEN_METEO|WEATHER|{location.lower()}|{severity}|{reason}",
             "impact": f"Potential weather disruption near {location}.",
         })
-    return events[:3]
+    return _aggregate_weather_events(candidates)
+
+
+def _aggregate_weather_events(events: list[dict]) -> list[dict]:
+    grouped: dict[str, list[dict]] = {}
+    for event in events:
+        grouped.setdefault(str(event["dedup_key"]), []).append(event)
+
+    aggregated: list[dict] = []
+    for group in grouped.values():
+        best = sorted(group, key=lambda event: (_severity_rank(event.get("severity")), str(event.get("event_time") or "")), reverse=True)[0]
+        times = sorted(str(event.get("event_time") or "") for event in group if event.get("event_time"))
+        item = dict(best)
+        item["event_id"] = f"EVT-METEO-{abs(hash(item['dedup_key'])) % 1000000:06d}"
+        item["description"] = _aggregated_description(item, len(group), times)
+        item["raw_payload"] = {
+            **(item.get("raw_payload") or {}),
+            "aggregated_hour_count": len(group),
+            "first_event_time": times[0] if times else item.get("event_time"),
+            "last_event_time": times[-1] if times else item.get("event_time"),
+            "sampled_event_times": times[:8],
+        }
+        aggregated.append(item)
+    return sorted(aggregated, key=lambda event: (_severity_rank(event.get("severity")), str(event.get("event_time") or "")), reverse=True)[:2]
+
+
+def _aggregated_description(event: dict, count: int, times: list[str]) -> str:
+    location = (event.get("locations") or ["the watched location"])[0]
+    reason = (event.get("raw_payload") or {}).get("reason") or "weather risk"
+    if count <= 1:
+        return f"Forecast indicates {reason} near {location}."
+    window = f" from {times[0]} to {times[-1]}" if times else ""
+    return f"Forecast indicates {reason} near {location} across {count} forecast hours{window}."
 
 
 def _weather_severity(precip, gust, code) -> tuple[str | None, str | None]:
@@ -115,6 +147,10 @@ def _weather_severity(precip, gust, code) -> tuple[str | None, str | None]:
     if code in {80, 81, 82}:
         return "MEDIUM", "rain shower weather code"
     return None, None
+
+
+def _severity_rank(severity) -> int:
+    return {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(str(severity or "").upper(), 0)
 
 
 def _watch_locations(watch_profile: dict) -> list[str]:

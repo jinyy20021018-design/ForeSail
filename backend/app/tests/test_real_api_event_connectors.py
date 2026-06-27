@@ -1,5 +1,6 @@
 import json
 import os
+import urllib.error
 import unittest
 from unittest.mock import patch
 
@@ -91,6 +92,19 @@ class RealApiEventConnectorTest(unittest.TestCase):
         self.assertTrue(events)
         self.assertEqual(events[0]["source"], "gdelt_event_connector")
         self.assertEqual(events[0]["event_type"], "PORT_DISRUPTION")
+
+    def test_gdelt_rate_limit_returns_warning_without_exception(self) -> None:
+        os.environ["GDELT_ENABLED"] = "true"
+        os.environ["GDELT_STOP_ON_RATE_LIMIT"] = "true"
+        case_id = self.create_confirmed_case()
+        error = urllib.error.HTTPError("https://api.gdeltproject.org/api/v2/doc/doc", 429, "Too Many Requests", {}, None)
+        with patch("app.services.event_connectors.gdelt_event_connector.urllib.request.urlopen", side_effect=error):
+            connector = GdeltEventConnector()
+            events = connector.fetch_events(get_watch_profile(case_id), case_id)
+        self.assertEqual(events, [])
+        self.assertTrue(connector.last_result["rate_limited"])
+        self.assertTrue(any("GDELT_RATE_LIMITED" in warning for warning in connector.last_result["warnings"]))
+        self.assertEqual(connector.last_result["connector_errors"], [])
 
     def test_open_meteo_high_wind_and_precipitation_events(self) -> None:
         os.environ["OPEN_METEO_ENABLED"] = "true"
