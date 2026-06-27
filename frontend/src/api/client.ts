@@ -1,5 +1,7 @@
 const API_BASE = "http://127.0.0.1:8000";
 
+export type TradePerspective = "BUYER" | "SELLER";
+
 export type TradeCase = {
   case_id: string;
   status: string;
@@ -17,6 +19,8 @@ export type TradeCase = {
   latest_shipment_date: string;
   payment_method: string;
   incoterm: string;
+  incoterm_named_place?: string;
+  trade_perspective?: TradePerspective;
   owner?: string;
   notes?: string;
   created_at?: string;
@@ -162,6 +166,13 @@ export type ExternalEvent = {
 export type EventConfig = {
   event_source_mode: "MOCK" | "REAL" | "HYBRID" | string;
   connectors: string[];
+  gdelt_enabled?: boolean;
+  open_meteo_enabled?: boolean;
+  gdelt_lookback_days?: number;
+  gdelt_max_records?: number;
+  external_event_query_limit?: number;
+  real_event_location_limit?: number;
+  open_meteo_forecast_days?: number;
   real_search_enabled?: boolean;
   real_search_provider?: string;
   real_search_lookback_days?: number;
@@ -195,19 +206,40 @@ export type ExternalEventSearchResult = {
   case_id: string;
   mode: string;
   queries_generated: ExternalEventQuery[];
-  rss_items_fetched: number;
-  rss_items_matched: number;
+  gdelt_articles_fetched?: number;
+  gdelt_events_extracted?: ExternalEvent[];
+  weather_locations_checked?: number;
+  weather_events_extracted?: ExternalEvent[];
+  rss_items_fetched?: number;
+  rss_items_matched?: number;
   events_extracted: ExternalEvent[];
   events_extracted_count: number;
-  connector_errors: Array<{ feed_url?: string; title?: string; error: string }>;
+  connector_errors: Array<{ connector?: string; query_id?: string; query?: string; location?: string; feed_url?: string; title?: string; error: string }>;
   warnings: string[];
   deduplication: Record<string, unknown>;
+};
+
+export type RealEventConfig = {
+  event_source_mode: string;
+  gdelt_enabled: boolean;
+  open_meteo_enabled: boolean;
+  gdelt_lookback_days: number;
+  gdelt_max_records: number;
+  external_event_query_limit?: number;
+  real_event_location_limit?: number;
+  open_meteo_forecast_days: number;
+  use_llm_event_extraction: boolean;
 };
 
 export type RiskExposure = {
   category: string;
   impact: string;
   severity: string;
+  party_perspective?: TradePerspective;
+  affected_party?: string;
+  responsible_party?: string;
+  incoterm_basis?: string;
+  cif_scenario?: string;
   evidence_event_ids: string[];
   trigger_event_ids?: string[];
   watch_event_ids?: string[];
@@ -217,6 +249,8 @@ export type RiskSummary = {
   triggered: boolean;
   trigger_events: string[];
   watch_events_considered?: string[];
+  trade_perspective?: TradePerspective;
+  incoterm_basis?: string;
   exposures: RiskExposure[];
 };
 
@@ -228,6 +262,9 @@ export type RecommendedAction = {
   deadline: string;
   status: string;
   related_exposure: string;
+  party_perspective?: TradePerspective;
+  responsible_party?: "BUYER" | "SELLER" | "SHARED" | "UNKNOWN" | string;
+  incoterm_basis?: string;
 };
 
 export type StatusTimelineEntry = {
@@ -325,6 +362,8 @@ export type ResidualRisk = {
   monitoring_trigger: string;
   owner_role: string;
   status: string;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
 };
@@ -353,6 +392,8 @@ export type TreatmentPlan = {
   recheck_triggers: string[];
   rationale: string;
   status: string;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
 };
@@ -375,8 +416,35 @@ export type ApprovalPackage = {
   decision_note: string | null;
   approval_scope?: string;
   conflict_safe_mode?: boolean;
+  perspective?: TradePerspective;
+  incoterm_basis?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type CifResponsibility = {
+  case_id: string;
+  incoterm: string;
+  incoterm_basis: string;
+  named_destination_port: string;
+  supported: boolean;
+  risk_transfer_point: string;
+  seller_responsibilities: string[];
+  buyer_responsibilities: string[];
+  cost_responsibility: Record<string, string>;
+  warnings: Array<{ code: string; message: string }>;
+};
+
+export type PerspectiveAnalysis = {
+  case_id: string;
+  trade_perspective: TradePerspective;
+  cif_responsibility: CifResponsibility;
+  risk_summary: RiskSummary;
+  obligations: ObligationDeadline[];
+  information_gaps: InformationGap[];
+  actions: RecommendedAction[];
+  treatment_plans: TreatmentPlan[];
+  relevance_results: RelevanceResult[];
 };
 
 export type FieldConflict = {
@@ -475,7 +543,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let message = `API request failed: ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body?.detail === "string" && body.detail.trim()) {
+        message = body.detail;
+      } else if (typeof body?.message === "string" && body.message.trim()) {
+        message = body.message;
+      }
+    } catch {
+      // Keep the status-only fallback if the response is not JSON.
+    }
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;
@@ -505,6 +584,7 @@ export const api = {
   getWatchProfile: (caseId: string) => request<WatchProfile>(`/api/cases/${caseId}/watch-profile`),
   getRelevanceResults: (caseId: string) => request<RelevanceResult[]>(`/api/cases/${caseId}/relevance-results`),
   getEventConfig: () => request<EventConfig>("/api/events/config"),
+  getRealEventConfig: () => request<RealEventConfig>("/api/events/real-config"),
   getExternalEvents: (caseId: string) => request<ExternalEvent[]>(`/api/cases/${caseId}/external-events`),
   getAgentRunExternalEvents: (caseId: string, agentRunId: string) =>
     request<ExternalEvent[]>(`/api/cases/${caseId}/agent-runs/${agentRunId}/external-events`),
@@ -516,6 +596,14 @@ export const api = {
     request<ExternalEventSearchResult>(`/api/cases/${caseId}/external-events/search`, { method: "POST" }),
   getRiskSummary: (caseId: string) => request<RiskSummary>(`/api/cases/${caseId}/risk-summary`),
   getActions: (caseId: string) => request<RecommendedAction[]>(`/api/cases/${caseId}/actions`),
+  getCifResponsibility: (caseId: string) => request<CifResponsibility>(`/api/cases/${caseId}/cif-responsibility`),
+  getPerspectiveAnalysis: (caseId: string, perspective: TradePerspective) =>
+    request<PerspectiveAnalysis>(`/api/cases/${caseId}/perspective-analysis?perspective=${perspective}`),
+  updatePerspective: (caseId: string, perspective: TradePerspective) =>
+    request<TradeCase>(`/api/cases/${caseId}/perspective`, {
+      method: "PUT",
+      body: JSON.stringify({ trade_perspective: perspective })
+    }),
   uploadDocument: async (caseId: string, file: File, documentType: string) => {
     const formData = new FormData();
     formData.append("file", file);

@@ -199,6 +199,8 @@ export function TreatmentPlansPanel({
                   <div><dt>Time</dt><dd>{plan.estimated_time_to_execute || "TBD"}</dd></div>
                   <div><dt>Approval</dt><dd>{plan.approval_required ? "Required" : "Not required"}</dd></div>
                   <div><dt>Status</dt><dd>{plan.status}</dd></div>
+                  <div><dt>Perspective</dt><dd>{plan.perspective || "SELLER"}</dd></div>
+                  <div><dt>Incoterm</dt><dd>{plan.incoterm_basis || "N/A"}</dd></div>
                   <div><dt>Covered Risks</dt><dd>{plan.covered_risks.length}</dd></div>
                   <div><dt>Residual Risks</dt><dd>{plan.residual_risks.length}</dd></div>
                 </dl>
@@ -253,6 +255,7 @@ function PlanDetails({ plan }: { plan: TreatmentPlan }) {
     <div className="workspace-grid">
       <section className="panel">
         <div className="panel-heading"><h2>Plan Details</h2></div>
+        <p className="subtle">Perspective: {plan.perspective || "SELLER"} | Incoterm basis: {plan.incoterm_basis || "N/A"}</p>
         <p>{plan.summary}</p>
         <ListBlock title="Required Actions" items={plan.required_actions} />
         <ListBlock title="Covered Risks" items={plan.covered_risks} />

@@ -17,9 +17,15 @@ class ExternalEventIngestionTest(unittest.TestCase):
         os.environ["EVENT_SOURCE_MODE"] = "MOCK"
         os.environ["WEATHER_API_ENABLED"] = "false"
         os.environ["NEWS_API_ENABLED"] = "false"
+        os.environ["GDELT_ENABLED"] = "false"
+        os.environ["OPEN_METEO_ENABLED"] = "false"
         os.environ["REAL_SEARCH_ENABLED"] = "false"
         os.environ["REAL_SEARCH_FEED_URLS"] = ""
         os.environ["USE_LLM_EVENT_EXTRACTION"] = "false"
+        os.environ["USE_LLM_EXTRACTION"] = "false"
+        os.environ["USE_LLM_SUMMARY"] = "false"
+        os.environ["REQUIRE_LLM_AGENT"] = "false"
+        os.environ["OPENAI_API_KEY"] = ""
         reset_store()
         reset_document_store()
         self.client = TestClient(app)
@@ -45,30 +51,31 @@ class ExternalEventIngestionTest(unittest.TestCase):
         os.environ["EVENT_SOURCE_MODE"] = "REAL"
         case_id = self.create_confirmed_case()
         result = fetch_events_for_case(case_id, get_watch_profile(case_id))
-        self.assertEqual(result["connectors_called"], ["weather_event_connector", "news_event_connector", "real_search_event_connector"])
+        self.assertEqual(result["connectors_called"], ["gdelt_event_connector", "real_search_event_connector", "open_meteo_weather_connector"])
         self.assertEqual(result["events_deduped_count"], 0)
 
     def test_hybrid_mode_calls_mock_and_real_connectors(self) -> None:
         os.environ["EVENT_SOURCE_MODE"] = "HYBRID"
         case_id = self.create_confirmed_case()
         result = fetch_events_for_case(case_id, get_watch_profile(case_id))
-        self.assertEqual(result["connectors_called"], ["mock_event_connector", "weather_event_connector", "news_event_connector", "real_search_event_connector"])
+        self.assertEqual(result["connectors_called"], ["mock_event_connector", "gdelt_event_connector", "real_search_event_connector", "open_meteo_weather_connector"])
         self.assertGreater(result["events_deduped_count"], 0)
 
-    def test_disabled_weather_and_news_return_empty_without_error(self) -> None:
+    def test_disabled_real_connectors_return_empty_without_error(self) -> None:
         os.environ["EVENT_SOURCE_MODE"] = "REAL"
         case_id = self.create_confirmed_case()
         result = fetch_events_for_case(case_id, get_watch_profile(case_id))
         self.assertEqual(result["connector_errors"], [])
         self.assertEqual(result["events_raw_count"], 0)
+        self.assertIn("REAL_MODE_NO_CONNECTORS_ENABLED", result["warnings"])
 
     def test_connector_failure_does_not_fail_ingestion(self) -> None:
         os.environ["EVENT_SOURCE_MODE"] = "REAL"
         case_id = self.create_confirmed_case()
-        with patch("app.services.event_connectors.weather_event_connector.WeatherEventConnector.fetch_events", side_effect=RuntimeError("weather down")):
+        with patch("app.services.event_connectors.gdelt_event_connector.GdeltEventConnector.fetch_events", side_effect=RuntimeError("gdelt down")):
             result = fetch_events_for_case(case_id, get_watch_profile(case_id))
         self.assertEqual(result["mode"], "REAL")
-        self.assertEqual(result["connector_errors"][0]["connector"], "weather_event_connector")
+        self.assertEqual(result["connector_errors"][0]["connector"], "gdelt_event_connector")
 
     def test_event_normalizer_outputs_complete_fields(self) -> None:
         event = normalize_event(
@@ -140,6 +147,30 @@ class ExternalEventIngestionTest(unittest.TestCase):
         result = classify_event(get_confirmed_facts(case_id), event)
         self.assertIn(result["classification"], {"Relevant", "Watch"})
         self.assertEqual(result["source_type"], "WEATHER")
+
+    def test_relevance_engine_handles_datetime_event_time(self) -> None:
+        case_id = self.create_confirmed_case()
+        event = normalize_event(
+            {
+                "event_id": "METEO-001",
+                "source": "open_meteo_weather_connector",
+                "source_type": "WEATHER",
+                "event_type": "WEATHER",
+                "title": "High weather risk near Chittagong",
+                "event_time": "2026-11-24T19:00",
+                "affected_ports": ["Chittagong"],
+                "affected_region": "Bangladesh",
+                "severity": "HIGH",
+                "confidence": 0.9,
+                "impact": "Potential weather disruption near Chittagong.",
+            },
+            case_id,
+        )
+        from app.services.document_service import get_confirmed_facts
+        from app.services.relevance_engine import classify_event
+
+        result = classify_event(get_confirmed_facts(case_id), event)
+        self.assertIn("shipment_window_overlap", result["matched_factors"])
 
 
 if __name__ == "__main__":

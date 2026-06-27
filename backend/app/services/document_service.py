@@ -2,10 +2,12 @@ import copy
 import json
 import os
 import re
+import shutil
 import urllib.error
 import urllib.request
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+UTC = timezone.utc
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO
@@ -49,6 +51,12 @@ _field_counter = 1
 def reset_document_store() -> None:
     global _doc_counter, _field_counter
     clear_runtime_document_cache()
+    if UPLOAD_DIR.exists():
+        for child in UPLOAD_DIR.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink(missing_ok=True)
     for namespace in [
         "documents",
         "extracted_fields",
@@ -242,6 +250,7 @@ def confirm_fields(case_id: str) -> dict:
         "presentation_period_days": _int_or_none(facts.get("presentation_period_days")),
         "payment_method": str(facts["payment_method"]),
         "incoterm": str(facts["incoterm"]),
+        "incoterm_named_place": str(facts.get("incoterm_named_place") or ""),
         "amount": _float_or_int(facts["amount"]),
         "currency": str(facts["currency"]),
         "booking_reference": facts.get("booking_reference"),
@@ -404,12 +413,6 @@ def detect_field_conflicts(case_id: str) -> list[dict]:
     incoterm_values = values_for("incoterm")
     add_conflict("incoterm", "Medium", incoterm_values, "The Incoterm extracted across trade documents differs.", "User should confirm the operative Incoterm.")
 
-    eta_values = values_for("eta")
-    if eta_values:
-        event_eta = {"value": "2026-12-13", "source_document_name": "mock_event_feed", "source_document_type": "EVENT", "field_id": "EVT-001"}
-        booking_values = eta_values + [event_eta]
-        add_conflict("eta", "Medium", booking_values, "Booking ETA differs from event-updated ETA by at least 3 days.", "User should confirm updated ETA with carrier.")
-
     previous = {conflict["conflict_id"]: conflict for conflict in _field_conflicts.get(case_id, [])}
     for conflict in conflicts:
         old = previous.get(conflict["conflict_id"])
@@ -543,11 +546,13 @@ def extract_fields_from_document(case_id: str, document: dict, raw_text: str, di
         field_names = [
             "commodity",
             "quantity",
+            "quantity_unit",
             "amount",
             "currency",
             "buyer",
             "seller",
             "incoterm",
+            "incoterm_named_place",
             "payment_method",
             "final_destination",
         ]
@@ -583,6 +588,9 @@ def fallback_demo_fields(case_id: str, documents: list[dict]) -> list[dict]:
         "presentation_period_days": 21,
         "payment_method": "LC at sight",
         "incoterm": "CIF",
+        "incoterm_named_place": "Chittagong",
+        "quantity": 100,
+        "quantity_unit": "MT",
         "amount": 1250000,
         "currency": "USD",
         "booking_reference": None,
@@ -639,9 +647,12 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         "buyer",
         "seller",
         "commodity",
+        "quantity",
+        "quantity_unit",
         "amount",
         "currency",
         "incoterm",
+        "incoterm_named_place",
         "payment_method",
         "port_of_loading",
         "port_of_discharge",
@@ -658,6 +669,10 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         "Extract trade document fields as strict JSON. Return only an object with a fields array. "
         "Each item must contain field_name, value, evidence_text, confidence. "
         f"Allowed field_name values: {', '.join(field_names)}. "
+        "Use amount only for monetary value, and currency only for currency code. "
+        "Use quantity for the numeric cargo quantity and quantity_unit for its unit. "
+        "For example, 'Quantity: 5000 metric tons' must become quantity=5000 and quantity_unit='metric tons', not amount. "
+        "Do not include units in amount. "
         "Do not infer legal conclusions, risk levels, conflicts, approvals, or monitoring decisions.\n\n"
         f"Document type: {document.get('document_type')}\n"
         f"Filename: {document.get('filename')}\n"
@@ -712,7 +727,8 @@ def _extract_value(field_name: str, raw_text: str, document: dict):
         "lc_expiry_date": r"(?:lc expiry|expiry date)[:\s]+([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2} [A-Za-z]+ [0-9]{4})",
         "presentation_period_days": r"presentation period[:\s]+([0-9]+)",
         "payment_method": r"payment(?: method)?[:\s]+([A-Za-z ]+)",
-        "incoterm": r"incoterm[:\s]+([A-Z]{3})",
+        "incoterm": r"(?:incoterm[:\s]+)?\b(CIF)\b",
+        "incoterm_named_place": r"(?:incoterm[: \t]+)?CIF[ \t]+([A-Za-z][A-Za-z .'-]+)",
         "amount": r"amount[:\s]+(?:USD|US\$|\$)?\s*([0-9,]+(?:\.[0-9]+)?)",
         "currency": r"currency[:\s]+([A-Z]{3})",
         "booking_reference": r"booking reference[:\s]+([A-Z0-9-]+)",
@@ -722,6 +738,7 @@ def _extract_value(field_name: str, raw_text: str, document: dict):
         "beneficiary": r"beneficiary[:\s]+([A-Za-z0-9 .,&-]+)",
         "commodity": r"commodity[:\s]+([A-Za-z0-9 .,&-]+)",
         "quantity": r"quantity[:\s]+([A-Za-z0-9 .,&-]+)",
+        "quantity_unit": r"quantity[:\s]+[0-9,]+(?:\.[0-9]+)?\s*([A-Za-z][A-Za-z .,&-]*)",
         "buyer": r"buyer[:\s]+([A-Za-z0-9 .,&-]+)",
         "seller": r"seller[:\s]+([A-Za-z0-9 .,&-]+)",
     }
@@ -730,6 +747,8 @@ def _extract_value(field_name: str, raw_text: str, document: dict):
         value = match.group(1).strip(" .,\r\n")
         if field_name in {"amount", "presentation_period_days"}:
             return _float_or_int(value)
+        if field_name == "quantity":
+            return _quantity_number(value)
         return _normalize_date(value) if "date" in field_name or field_name in {"etd", "eta"} else value
     return None
 
@@ -748,6 +767,9 @@ def _default_value(field_name: str):
         "presentation_period_days": 21,
         "payment_method": "LC at sight",
         "incoterm": "CIF",
+        "incoterm_named_place": "Chittagong",
+        "quantity": 100,
+        "quantity_unit": "MT",
         "amount": 1250000,
         "currency": "USD",
         "partial_shipment_allowed": True,
@@ -822,7 +844,20 @@ def _find_field(case_id: str, field_id: str) -> dict:
 def _float_or_int(value):
     if value in {None, ""}:
         return None
-    number = float(str(value).replace(",", ""))
+    try:
+        number = float(str(value).replace(",", ""))
+    except ValueError as error:
+        raise ValueError(f"Invalid numeric amount: {value}") from error
+    return int(number) if number.is_integer() else number
+
+
+def _quantity_number(value):
+    if value in {None, ""}:
+        return None
+    match = re.match(r"^([0-9][0-9,]*(?:\.[0-9]+)?)", str(value).strip())
+    if not match:
+        return value
+    number = float(match.group(1).replace(",", ""))
     return int(number) if number.is_integer() else number
 
 

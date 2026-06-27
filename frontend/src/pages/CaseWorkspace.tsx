@@ -6,6 +6,7 @@ import {
   type AgentRunRecord,
   type AgentRunResponse,
   type AgentRunTraceStep,
+  type CifResponsibility,
   type DocumentRecord,
   type EventConfig,
   type ExternalEvent,
@@ -18,6 +19,7 @@ import {
   type RiskSummary,
   type StatusTimelineEntry,
   type TreatmentPlan,
+  type TradePerspective,
   type TradeCase,
   type WatchProfile,
   type WorkflowState
@@ -63,6 +65,63 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "audit", label: "Audit" }
 ];
 
+const confirmRequiredFields = [
+  "vessel",
+  "port_of_loading",
+  "port_of_discharge",
+  "etd",
+  "eta",
+  "latest_shipment_date",
+  "payment_method",
+  "incoterm",
+  "amount",
+  "currency",
+];
+
+const fieldLabels: Record<string, string> = {
+  vessel: "Vessel",
+  port_of_loading: "Port of Loading",
+  port_of_discharge: "Port of Discharge",
+  etd: "ETD",
+  eta: "ETA",
+  latest_shipment_date: "Latest Shipment Date",
+  payment_method: "Payment Method",
+  incoterm: "Incoterm",
+  amount: "Amount",
+  currency: "Currency",
+};
+
+const agentProgressSteps = [
+  {
+    title: "Load confirmed case facts",
+    detail: "Reading vessel, route, ports, shipment window, LC deadline, and Incoterm."
+  },
+  {
+    title: "Build watch profile",
+    detail: "Preparing watched vessel, ports, route regions, and deadline sensitivity."
+  },
+  {
+    title: "Fetch real external events",
+    detail: "Calling GDELT and Open-Meteo with the narrowed real-search query window."
+  },
+  {
+    title: "Normalize and deduplicate events",
+    detail: "Converting connector output to normalized events and removing duplicates."
+  },
+  {
+    title: "Classify relevance",
+    detail: "Scoring events against this case with deterministic relevance rules."
+  },
+  {
+    title: "Map obligations, gaps, and actions",
+    detail: "Mapping exposures to deadlines, information gaps, and recommended actions."
+  },
+  {
+    title: "Generate treatment outputs",
+    detail: "Creating treatment plans, residual risk summaries, approval draft, and audit trace."
+  }
+];
+
 export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Props) {
   const [tradeCase, setTradeCase] = useState<TradeCase | null>(null);
   const [watchProfile, setWatchProfile] = useState<WatchProfile | null>(null);
@@ -83,22 +142,38 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   const [drafts, setDrafts] = useState<ActionDraft[]>([]);
   const [treatmentPlans, setTreatmentPlans] = useState<TreatmentPlan[]>([]);
   const [approvalPackages, setApprovalPackages] = useState<ApprovalPackage[]>([]);
+  const [cifResponsibility, setCifResponsibility] = useState<CifResponsibility | null>(null);
   const [hasConfirmedFacts, setHasConfirmedFacts] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTabFromUrl());
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [agentElapsedSeconds, setAgentElapsedSeconds] = useState(0);
+  const [agentProgressStep, setAgentProgressStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const highOpenConflicts = useMemo(
     () => conflicts.filter((conflict) => conflict.severity === "High" && conflict.status === "OPEN"),
     [conflicts]
   );
+  const missingConfirmFields = useMemo(() => {
+    const confirmedFieldNames = new Set(
+      fields
+        .filter((field) => field.review_status === "APPROVED" || field.review_status === "EDITED")
+        .filter((field) => {
+          const value = field.review_status === "EDITED" ? field.edited_value : field.value;
+          return value !== null && value !== "";
+        })
+        .map((field) => field.field_name)
+    );
+    return confirmRequiredFields.filter((field) => !confirmedFieldNames.has(field));
+  }, [fields]);
 
   async function refreshCase() {
     setError(null);
     const current = await api.getCase(caseId);
     setTradeCase(current);
     onCaseChange(current);
+    const perspective = current.trade_perspective ?? "SELLER";
     const [
       profile,
       statusTimeline,
@@ -117,7 +192,8 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       draftItems,
       planItems,
       approvalItems,
-      confirmedFacts
+      confirmedFacts,
+      perspectiveResult
     ] = await Promise.all([
       api.getWatchProfile(caseId).catch(() => null),
       api.getStatusTimeline(caseId).catch(() => []),
@@ -136,7 +212,8 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       api.getActionDrafts(caseId).catch(() => []),
       api.listTreatmentPlans(caseId).catch(() => []),
       api.listApprovalPackages(caseId).catch(() => []),
-      api.getConfirmedFacts(caseId).then(() => true).catch(() => false)
+      api.getConfirmedFacts(caseId).then(() => true).catch(() => false),
+      api.getPerspectiveAnalysis(caseId, perspective).catch(() => null)
     ]);
     setWatchProfile(profile);
     setTimeline(statusTimeline);
@@ -147,14 +224,15 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     setAgentRuns(runs);
     setEventConfig(config);
     setExternalEvents(storedEvents);
-    setRelevanceResults(relevance);
-    setRiskSummary(risk);
-    setActions(actionItems);
-    setObligations(obligationItems);
-    setGaps(gapItems);
+    setRelevanceResults(perspectiveResult?.relevance_results ?? relevance);
+    setRiskSummary(perspectiveResult?.risk_summary ?? risk);
+    setActions(perspectiveResult?.actions ?? actionItems);
+    setObligations(perspectiveResult?.obligations ?? obligationItems);
+    setGaps(perspectiveResult?.information_gaps ?? gapItems);
     setDrafts(draftItems);
-    setTreatmentPlans(planItems);
+    setTreatmentPlans(perspectiveResult?.treatment_plans ?? planItems);
     setApprovalPackages(approvalItems);
+    setCifResponsibility(perspectiveResult?.cif_responsibility ?? null);
     setHasConfirmedFacts(confirmedFacts);
     const latestRun = latestAgentRun(runs);
     if (latestRun) {
@@ -200,14 +278,30 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     setDrafts([]);
     setTreatmentPlans([]);
     setApprovalPackages([]);
+    setCifResponsibility(null);
     setHasConfirmedFacts(false);
     refreshCase()
       .catch((caught) => setError(caught instanceof Error ? caught.message : "Failed to load case workspace."))
       .finally(() => setIsLoading(false));
   }, [caseId]);
 
+  useEffect(() => {
+    if (!isRunning) {
+      setAgentElapsedSeconds(0);
+      setAgentProgressStep(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setAgentElapsedSeconds(elapsed);
+      setAgentProgressStep(Math.min(agentProgressSteps.length - 1, Math.floor(elapsed / 8)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+
   async function confirmFields() {
-    if (fields.length === 0 || highOpenConflicts.length > 0) return;
+    if (fields.length === 0 || highOpenConflicts.length > 0 || missingConfirmFields.length > 0) return;
     setError(null);
     try {
       const facts = await api.confirmFields(caseId);
@@ -224,21 +318,27 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   async function runAgent() {
     if (!hasConfirmedFacts || highOpenConflicts.length > 0) return;
     setIsRunning(true);
+    setAgentElapsedSeconds(0);
+    setAgentProgressStep(0);
+    setActiveTab("agent");
     setError(null);
     try {
       const result = await api.runAgentMonitoringCycle(caseId);
+      const perspective = result.case.trade_perspective ?? "SELLER";
+      const analysis = await api.getPerspectiveAnalysis(caseId, perspective).catch(() => null);
       setAgentResult(result);
       setTradeCase(result.case);
       onCaseChange(result.case);
       setWatchProfile(result.watch_profile);
       setTimeline(result.status_timeline);
-      setRelevanceResults(result.relevance_results);
-      setRiskSummary(result.risk_summary);
-      setActions(result.actions);
-      setObligations(result.obligations);
-      setGaps(result.information_gaps);
+      setRelevanceResults(analysis?.relevance_results ?? result.relevance_results);
+      setRiskSummary(analysis?.risk_summary ?? result.risk_summary);
+      setActions(analysis?.actions ?? result.actions);
+      setObligations(analysis?.obligations ?? result.obligations);
+      setGaps(analysis?.information_gaps ?? result.information_gaps);
       setDrafts(result.action_drafts);
-      setTreatmentPlans(await api.listTreatmentPlans(caseId));
+      setTreatmentPlans(analysis?.treatment_plans ?? await api.listTreatmentPlans(caseId));
+      setCifResponsibility(analysis?.cif_responsibility ?? null);
       setApprovalPackages(await api.listApprovalPackages(caseId));
       setExternalEvents(await api.getExternalEvents(caseId));
       setAgentRuns(await api.getAgentRuns(caseId));
@@ -264,6 +364,26 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     }
   }
 
+  async function changePerspective(nextPerspective: TradePerspective) {
+    if (!tradeCase || tradeCase.trade_perspective === nextPerspective) return;
+    setError(null);
+    try {
+      const updated = await api.updatePerspective(caseId, nextPerspective);
+      const analysis = await api.getPerspectiveAnalysis(caseId, nextPerspective);
+      setTradeCase(updated);
+      onCaseChange(updated);
+      setRelevanceResults(analysis.relevance_results);
+      setRiskSummary(analysis.risk_summary);
+      setActions(analysis.actions);
+      setObligations(analysis.obligations);
+      setGaps(analysis.information_gaps);
+      setTreatmentPlans(analysis.treatment_plans);
+      setCifResponsibility(analysis.cif_responsibility);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Perspective update failed.");
+    }
+  }
+
   if (isLoading) {
     return <section className="page"><p className="empty-state">Loading case workspace...</p></section>;
   }
@@ -279,6 +399,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
 
   const canRunAgent = hasConfirmedFacts && highOpenConflicts.length === 0 && tradeCase.status !== "MONITORING";
   const canContinue = tradeCase.status === "ACTION_REQUIRED";
+  const selectedPerspective = tradeCase.trade_perspective ?? "SELLER";
 
   return (
     <section className="page workspace-page">
@@ -293,7 +414,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           <div className="title-row">
             <h1>{tradeCase.vessel} Trade Watch</h1>
           <CaseStatusBadge value={tradeCase.status} />
-            <span className="tag">Event Mode: {eventConfig?.event_source_mode ?? "MOCK"}</span>
+            <span className="tag">Event Mode: {eventConfig?.event_source_mode ?? "Loading"}</span>
           </div>
           <p>Live trade-risk workspace for {tradeCase.route}</p>
           {highOpenConflicts.length > 0 && (
@@ -301,6 +422,19 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           )}
         </div>
         <div className="header-actions">
+          <div className="perspective-toggle" aria-label="Perspective">
+            <span>Perspective</span>
+            {(["BUYER", "SELLER"] as TradePerspective[]).map((perspective) => (
+              <button
+                key={perspective}
+                className={selectedPerspective === perspective ? "active" : ""}
+                type="button"
+                onClick={() => changePerspective(perspective)}
+              >
+                {perspective === "BUYER" ? "Buyer" : "Seller"}
+              </button>
+            ))}
+          </div>
           <button className="secondary-action" type="button" onClick={runAgent} disabled={!canRunAgent || isRunning}>
             <span className="run-agent-icon" aria-hidden="true">↻</span>{isRunning ? "Agent Running..." : "Run Agent Monitoring Cycle"}
           </button>
@@ -319,6 +453,13 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       </div>
 
       {error && <div className="error">{error}</div>}
+      {isRunning && (
+        <AgentRunProgressPanel
+          activeStep={agentProgressStep}
+          elapsedSeconds={agentElapsedSeconds}
+          eventConfig={eventConfig}
+        />
+      )}
       <WorkflowStepper workflow={workflow} />
 
       <div className="tabs">
@@ -339,6 +480,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           </div>
           <div className="workspace-grid">
             <CaseSnapshot tradeCase={tradeCase} language={language} />
+            <CifResponsibilityCard responsibility={cifResponsibility} tradeCase={tradeCase} />
             {watchProfile && <WatchProfilePanel profile={watchProfile} language={language} />}
           </div>
           <RouteRiskMap tradeCase={tradeCase} />
@@ -374,7 +516,18 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
             onError={setError}
             language={language}
           />
-          <button className="primary-action section-action" type="button" onClick={confirmFields} disabled={fields.length === 0 || highOpenConflicts.length > 0}>
+          {missingConfirmFields.length > 0 && (
+            <div className="warning-banner">
+              Confirm Case Facts requires: {missingConfirmFields.map((field) => fieldLabels[field] ?? field).join(", ")}. Upload the missing document(s) or edit extracted fields before confirming.
+            </div>
+          )}
+          <button
+            className="primary-action section-action"
+            type="button"
+            onClick={confirmFields}
+            disabled={fields.length === 0 || highOpenConflicts.length > 0 || missingConfirmFields.length > 0}
+            title={missingConfirmFields.length > 0 ? `Missing required fields: ${missingConfirmFields.map((field) => fieldLabels[field] ?? field).join(", ")}` : undefined}
+          >
             Confirm Fields
           </button>
         </>
@@ -458,12 +611,103 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   );
 }
 
+function CifResponsibilityCard({ responsibility, tradeCase }: { responsibility: CifResponsibility | null; tradeCase: TradeCase }) {
+  const incoterm = (responsibility?.incoterm || tradeCase.incoterm || "").toUpperCase();
+  const namedPlace = responsibility?.named_destination_port || tradeCase.incoterm_named_place || "";
+  const warnings = responsibility?.warnings ?? [];
+  const missingIncoterm = !incoterm;
+  const unsupported = Boolean(incoterm && incoterm !== "CIF");
+  const missingNamedPlace = warnings.some((warning) => warning.code === "CIF_NAMED_DESTINATION_PORT_MISSING");
+
+  return (
+    <section className="panel cif-card">
+      <div className="panel-heading">
+        <h2>CIF Responsibility</h2>
+        <span className="tag">{incoterm || "Missing"}</span>
+      </div>
+      {missingIncoterm ? (
+        <p className="warning-banner">Incoterm is missing. CIF responsibility analysis cannot be completed.</p>
+      ) : unsupported ? (
+        <p className="notice">This MVP focuses on CIF. Other Incoterms are not fully supported yet.</p>
+      ) : (
+        <>
+          {missingNamedPlace && <p className="warning-banner">CIF named destination port is missing. Responsibility analysis may be incomplete.</p>}
+          <dl className="field-grid">
+            <div><dt>Incoterm</dt><dd>CIF</dd></div>
+            <div><dt>Named Destination Port</dt><dd>{namedPlace || "Missing"}</dd></div>
+            <div><dt>Risk Transfer Point</dt><dd>{responsibility?.risk_transfer_point || "Loaded on board at port of loading"}</dd></div>
+          </dl>
+          <h3>Seller Responsibilities</h3>
+          <ul className="rule-list">
+            {(responsibility?.seller_responsibilities ?? [
+              "export clearance",
+              "load goods on board",
+              "arrange freight",
+              "arrange insurance",
+              "provide shipping and insurance documents",
+              "meet LC shipment and presentation deadlines"
+            ]).map((item) => <li key={`seller-${item}`}>{item}</li>)}
+          </ul>
+          <h3>Buyer Responsibilities</h3>
+          <ul className="rule-list">
+            {(responsibility?.buyer_responsibilities ?? [
+              "bear risk after loading",
+              "import clearance",
+              "import duties",
+              "destination port handling / delay exposure",
+              "receive cargo"
+            ]).map((item) => <li key={`buyer-${item}`}>{item}</li>)}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return <div><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function WorkspaceMetric({ icon, tone, label, value, detail, onClick }: { icon: "shield" | "check" | "info" | "agent"; tone: string; label: string; value: string; detail: string; onClick: () => void }) {
   return <button className="workspace-metric" type="button" onClick={onClick}><span className={`metric-icon ${tone}`}><MetricGlyph name={icon} /></span><span><b>{label}</b><strong>{value}</strong><small>{detail}</small></span><em>View details →</em></button>;
+}
+
+function AgentRunProgressPanel({ activeStep, elapsedSeconds, eventConfig }: { activeStep: number; elapsedSeconds: number; eventConfig: EventConfig | null }) {
+  const mode = eventConfig?.event_source_mode ?? "REAL";
+  const queryLimit = eventConfig?.external_event_query_limit ?? 3;
+  const connectorText = eventConfig?.connectors?.length ? eventConfig.connectors.join(", ") : "configured connectors";
+
+  return (
+    <section className="agent-run-window" aria-live="polite">
+      <div className="agent-run-window-header">
+        <div>
+          <span className="run-live-dot" />
+          <strong>Agent is running</strong>
+          <small>
+            {mode} mode · max {queryLimit} external event queries · {connectorText}
+          </small>
+        </div>
+        <span className="tag">{elapsedSeconds}s elapsed</span>
+      </div>
+      <div className="agent-run-progress">
+        {agentProgressSteps.map((step, index) => {
+          const state = index < activeStep ? "done" : index === activeStep ? "active" : "pending";
+          return (
+            <div className={`agent-run-progress-step ${state}`} key={step.title}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <small>{step.detail}</small>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p>
+        This window shows the current estimated stage while the backend request is running. The final persisted Agent Trace appears after completion.
+      </p>
+    </section>
+  );
 }
 
 function MetricGlyph({ name }: { name: "shield" | "check" | "info" | "agent" }) {
