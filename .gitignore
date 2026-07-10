@@ -11,3 +11,7 @@ frontend/dist/
 backend/foresail.db
 debug-*.log
 .cursor/debug-*.log
+backend/server*.log
+frontend/server*.log
+*.env.bak
+backend/app/uploads/

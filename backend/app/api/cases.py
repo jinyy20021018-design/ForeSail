@@ -16,7 +16,7 @@ from app.services.case_service import (
     update_case_details,
 )
 from app.services.case_library_service import list_case_summaries
-from app.services.document_service import seed_demo_documents
+from app.services.document_service import confirm_fields, seed_demo_documents
 from app.services.incoterm_rule_service import resolve_cif_responsibility
 from app.services.perspective_service import (
     UNSUPPORTED_PERSPECTIVE_ERROR,
@@ -24,6 +24,7 @@ from app.services.perspective_service import (
     perspective_analysis,
     update_case_perspective,
 )
+from app.services.hazard_service import list_hazards
 from app.services.route_map_service import build_route_map
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -69,7 +70,9 @@ def create_new_case(payload: CreateCasePayload) -> dict:
 
 @router.post("/demo")
 def create_demo() -> dict:
-    return create_demo_case()
+    case = create_demo_case()
+    confirm_fields(case["case_id"])
+    return get_case(case["case_id"])
 
 
 @router.post("/demo/clean")
@@ -154,6 +157,15 @@ def read_actions(case_id: str) -> list[dict]:
 @router.get("/{case_id}/route-map")
 def read_route_map(case_id: str) -> dict:
     return _or_404(lambda: build_route_map(case_id), case_id)
+
+
+@router.get("/{case_id}/hazards")
+def read_hazards(case_id: str) -> list[dict]:
+    def _hazards() -> list[dict]:
+        get_case(case_id)
+        return list_hazards(case_id)
+
+    return _or_404(_hazards, case_id)
 
 
 @router.get("/{case_id}/status-timeline")

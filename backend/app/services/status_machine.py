@@ -7,12 +7,18 @@ VALID_SEQUENCE = [
     "MONITORING",
 ]
 
+ALLOWED_TRANSITIONS = {
+    "DRAFT": {"ACTIVE"},
+    "ACTIVE": {"WATCHING", "AT_RISK", "ACTION_REQUIRED", "MONITORING"},
+    "WATCHING": {"AT_RISK", "ACTION_REQUIRED", "MONITORING"},
+    "AT_RISK": {"WATCHING", "ACTION_REQUIRED", "MONITORING"},
+    "ACTION_REQUIRED": {"AT_RISK", "MONITORING"},
+    "MONITORING": {"WATCHING", "AT_RISK", "ACTION_REQUIRED"},
+}
+
 
 def can_transition(current_status: str, next_status: str) -> bool:
-    try:
-        return VALID_SEQUENCE.index(next_status) >= VALID_SEQUENCE.index(current_status)
-    except ValueError:
-        return False
+    return next_status in ALLOWED_TRANSITIONS.get(current_status, set())
 
 
 def transition_case(case: dict, next_status: str, timeline: list[dict], reason: str) -> dict:

@@ -1,9 +1,20 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 UTC = timezone.utc
 
 VALID_SOURCE_TYPES = {"MOCK", "WEATHER", "NEWS", "PORT", "GEOPOLITICAL", "POLICY", "MANUAL"}
 VALID_EVENT_TYPES = {"VESSEL_DELAY", "PORT_DISRUPTION", "WEATHER", "SECURITY", "GEOPOLITICAL", "TRADE_POLICY", "ROUTE_DISRUPTION", "UNKNOWN"}
 VALID_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"}
+
+DEFAULT_IMPACT_DURATION_DAYS = {
+    "WEATHER": 3,
+    "PORT_DISRUPTION": 7,
+    "SECURITY": 14,
+    "GEOPOLITICAL": 14,
+    "TRADE_POLICY": 30,
+    "ROUTE_DISRUPTION": 14,
+    "VESSEL_DELAY": 7,
+    "UNKNOWN": 7,
+}
 
 LEGACY_EVENT_TYPE_MAP = {
     "PORT_STRIKE": "PORT_DISRUPTION",
@@ -55,6 +66,7 @@ def normalize_event(event: dict, case_id: str, index: int = 1, source_hint: str 
         "description": str(event.get("description") or event.get("impact") or title),
         "event_time": event_time,
         "published_at": published_at,
+        "expected_impact_window": _impact_window(event, event_type, event_time),
         "locations": locations,
         "affected_ports": affected_ports,
         "affected_routes": affected_routes,
@@ -131,6 +143,41 @@ def _date_or_datetime(value) -> str | None:
     if value in {None, ""}:
         return None
     return str(value)
+
+
+def _impact_window(event: dict, event_type: str, event_time: str | None) -> dict | None:
+    explicit = event.get("expected_impact_window")
+    if isinstance(explicit, dict) and explicit.get("start") and explicit.get("end"):
+        return {"start": str(explicit["start"]), "end": str(explicit["end"]), "basis": str(explicit.get("basis") or "explicit")}
+
+    if event_type == "VESSEL_DELAY" and event.get("new_eta"):
+        start = event_time or str(event.get("old_eta") or "")
+        if start:
+            return {"start": start, "end": str(event["new_eta"]), "basis": "eta_shift"}
+
+    start_date = _parse_date(event_time)
+    if start_date is None:
+        return None
+    duration = DEFAULT_IMPACT_DURATION_DAYS.get(event_type, 7)
+    return {
+        "start": start_date.isoformat(),
+        "end": (start_date + timedelta(days=duration)).isoformat(),
+        "basis": "type_default",
+    }
+
+
+def _parse_date(value):
+    if value in {None, ""}:
+        return None
+    text = str(value).strip()
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _dedup_key(source_type: str, event_type: str, title: str, event_time: str | None, ports: list[str], vessels: list[str]) -> str:

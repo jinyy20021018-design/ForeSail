@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 
+from app.services.incoterm_rule_service import attribute_event
 from app.services.route_region_service import (
     event_text_mentions_corridor,
     merge_watched_route_regions,
@@ -73,10 +74,25 @@ def classify_event(case: dict, event: dict) -> dict:
         matched_factors.append("high_severity")
 
     if event["type"] == "WEATHER" and "vessel_match" not in matched_factors:
-        score = min(score, 60)
-        matched_factors.append("weather_watch_cap")
+        departure_threat = has_port_match and "shipment_window_overlap" in matched_factors
+        if not departure_threat:
+            score = min(score, 60)
+            matched_factors.append("weather_watch_cap")
+
+    confidence = event.get("confidence")
+    if confidence is not None and score > 0:
+        try:
+            factor = 0.6 + 0.4 * max(0.0, min(float(confidence), 1.0))
+            score = round(score * factor)
+            matched_factors.append("confidence_weighted")
+        except (TypeError, ValueError):
+            pass
 
     classification = _classification(score)
+    attribution = attribute_event(case, event)
+    if classification == "Relevant" and not attribution["monitor_worthy"]:
+        classification = "Watch"
+        matched_factors.append("incoterm_risk_not_ours")
     mapped_exposures = map_event_to_exposures(event, classification, case)
 
     return {
@@ -87,8 +103,11 @@ def classify_event(case: dict, event: dict) -> dict:
         "raw_score": score,
         "display_score": max(0, min(score, 100)),
         "matched_factors": matched_factors,
-        "explanation": _explain(event, classification, mapped_exposures),
+        "explanation": _explain(event, classification, mapped_exposures, attribution),
         "mapped_exposures": mapped_exposures,
+        "attribution": attribution,
+        "delay_days": event.get("delay_days"),
+        "expected_impact_window": event.get("expected_impact_window"),
         "source": event.get("source"),
         "source_type": event.get("source_type"),
         "event_type": event.get("event_type") or event.get("type"),
@@ -110,12 +129,23 @@ def _classification(score: int) -> str:
 
 
 def _is_near_shipment_window(case: dict, event: dict) -> bool:
-    event_date = _parse_date_like(event.get("event_time"))
     etd = _parse_date_like(case.get("etd"))
     eta = _parse_date_like(case.get("eta"))
-    if not event_date or not etd or not eta:
+    if not etd or not eta:
         return False
-    return etd - timedelta(days=3) <= event_date <= eta + timedelta(days=3)
+    voyage_start = etd - timedelta(days=3)
+    voyage_end = eta + timedelta(days=3)
+
+    window = event.get("expected_impact_window") or {}
+    impact_start = _parse_date_like(window.get("start"))
+    impact_end = _parse_date_like(window.get("end"))
+    if impact_start and impact_end:
+        return impact_start <= voyage_end and impact_end >= voyage_start
+
+    event_date = _parse_date_like(event.get("event_time"))
+    if not event_date:
+        return False
+    return voyage_start <= event_date <= voyage_end
 
 
 def _parse_date_like(value) -> date | None:
@@ -139,11 +169,17 @@ def _affects_deadline(event: dict) -> bool:
     return "eta" in impact or "latest shipment" in impact or "departure delay" in impact
 
 
-def _explain(event: dict, classification: str, mapped_exposures: list[str]) -> str:
+def _explain(event: dict, classification: str, mapped_exposures: list[str], attribution: dict) -> str:
     if classification == "Irrelevant":
         return "Filtered out because it does not overlap with the watched vessel, ports, or route corridor."
 
     exposure_text = ", ".join(mapped_exposures) if mapped_exposures else "no direct exposure"
     if classification == "Relevant":
-        return f"{event['title']} directly matches the case watch profile and maps to {exposure_text}."
+        return f"{event['title']} directly matches the case watch profile and maps to {exposure_text}. {attribution['attribution_note']}"
+    if not attribution["monitor_worthy"] and attribution["legs_hit"]:
+        return (
+            f"{event['title']} overlaps the route, but under {attribution['incoterm']} the affected leg is not "
+            f"{attribution['trade_perspective']}'s risk and {attribution['trade_perspective']} cannot act on it; monitor as Watch. "
+            f"{attribution['attribution_note']}"
+        )
     return f"{event['title']} overlaps the case route or shipment window, but lacks a confirmed vessel delay or direct disruption; monitor as Watch."

@@ -258,6 +258,7 @@ def confirm_fields(case_id: str) -> dict:
         "payment_method": str(facts["payment_method"]),
         "incoterm": str(facts["incoterm"]),
         "incoterm_named_place": str(facts.get("incoterm_named_place") or ""),
+        "trade_perspective": str(facts.get("trade_perspective") or base_case.get("trade_perspective") or "SELLER"),
         "amount": _float_or_int(facts["amount"]),
         "currency": str(facts["currency"]),
         "booking_reference": facts.get("booking_reference"),

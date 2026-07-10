@@ -10,6 +10,7 @@ from app.services.document_service import reset_document_store
 
 class CaseLibraryTest(unittest.TestCase):
     def setUp(self) -> None:
+        os.environ["EVENT_SOURCE_MODE"] = "MOCK"
         os.environ["USE_LLM_SUMMARY"] = "false"
         os.environ["REQUIRE_LLM_AGENT"] = "false"
         os.environ["OPENAI_API_KEY"] = ""

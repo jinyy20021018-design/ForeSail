@@ -140,6 +140,7 @@ def _aggregate_weather_events(events: list[dict]) -> list[dict]:
         last_time = max(str(item.get("event_time") or "") for item in group)
         output = dict(best)
         output["event_id"] = f"EVT-METEO-{abs(hash(dedup_key)) % 1000000:06d}"
+        output["expected_impact_window"] = {"start": first_time, "end": last_time, "basis": "forecast"}
         output["description"] = f"{best['description']} Signal appears across {len(group)} forecast hour(s) from {first_time} to {last_time}."
         output["raw_payload"] = {**(best.get("raw_payload") or {}), "aggregated_hour_count": len(group), "first_event_time": first_time, "last_event_time": last_time}
         aggregated.append(output)

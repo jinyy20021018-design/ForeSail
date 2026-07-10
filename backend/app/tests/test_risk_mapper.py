@@ -30,15 +30,15 @@ class RiskMapperTest(unittest.TestCase):
     def test_summary_is_triggered_by_relevant_events(self) -> None:
         summary = summarize_exposures(self.case, self.events, self.results)
         self.assertTrue(summary["triggered"])
-        self.assertEqual(set(summary["trigger_events"]), {"EVT-001", "EVT-002"})
-        self.assertEqual(summary["watch_events_considered"], ["EVT-003"])
+        self.assertEqual(set(summary["trigger_events"]), {"EVT-001", "EVT-002", "EVT-003"})
+        self.assertEqual(summary["watch_events_considered"], [])
 
     def test_trigger_and_watch_evidence_are_separated(self) -> None:
         summary = summarize_exposures(self.case, self.events, self.results)
         exposure_by_category = {exposure["category"]: exposure for exposure in summary["exposures"]}
 
         self.assertIn("EVT-001", exposure_by_category["LC Deadline"]["trigger_event_ids"])
-        self.assertIn("EVT-003", exposure_by_category["LC Deadline"]["watch_event_ids"])
+        self.assertIn("EVT-003", exposure_by_category["LC Deadline"]["trigger_event_ids"])
 
 
 if __name__ == "__main__":

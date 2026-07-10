@@ -52,6 +52,7 @@ def reset_store() -> None:
         "residual_risk",
         "approval_package",
         "external_event",
+        "hazards",
     ]:
         clear_namespace(namespace)
 
@@ -248,6 +249,7 @@ def set_monitoring_outputs(
     relevance_results: list[dict],
     risk_summary: dict,
     actions: list[dict],
+    hazard_delta: dict | None = None,
 ) -> None:
     if case_id not in _cases:
         get_case(case_id)
@@ -256,14 +258,25 @@ def set_monitoring_outputs(
 
     case = _cases[case_id]
     timeline = _timelines[case_id]
-    if can_transition(case["status"], "WATCHING"):
+    triggered = risk_summary["triggered"]
+
+    if case["status"] == "ACTIVE" and can_transition(case["status"], "WATCHING"):
         transition_case(case, "WATCHING", timeline, "Monitoring started with configured external event feed.")
 
-    if risk_summary["triggered"] and can_transition(case["status"], "AT_RISK"):
+    if triggered and can_transition(case["status"], "AT_RISK"):
         transition_case(case, "AT_RISK", timeline, "At least one Relevant event was detected.")
 
-    if actions and can_transition(case["status"], "ACTION_REQUIRED"):
+    if triggered and actions and can_transition(case["status"], "ACTION_REQUIRED"):
         transition_case(case, "ACTION_REQUIRED", timeline, "Recommended actions were generated for the triggered exposures.")
+
+    if (
+        not triggered
+        and hazard_delta is not None
+        and hazard_delta.get("all_clear")
+        and case["status"] in {"AT_RISK", "ACTION_REQUIRED"}
+        and can_transition(case["status"], "MONITORING")
+    ):
+        transition_case(case, "MONITORING", timeline, "All previously detected hazards are resolved; case returned to routine monitoring.")
 
     _results[case_id] = copy.deepcopy(relevance_results)
     _risk_summaries[case_id] = copy.deepcopy(risk_summary)

@@ -57,11 +57,31 @@ def _value(value) -> str:
     return str(value or "").strip()
 
 
+TYPE_PRIORITY = ["VESSEL", "GEOPOLITICAL", "PORT", "TRADE_POLICY", "WEATHER_REGION", "GENERAL_SHIPPING"]
+
+
 def _limit_queries(queries: list[dict]) -> list[dict]:
     try:
         limit = int(os.getenv("EXTERNAL_EVENT_QUERY_LIMIT", "3"))
     except ValueError:
         limit = 3
-    if limit <= 0:
+    if limit <= 0 or len(queries) <= limit:
         return queries
-    return queries[:limit]
+
+    by_type: dict[str, list[dict]] = {}
+    for query in queries:
+        by_type.setdefault(query["query_type"], []).append(query)
+
+    selected: list[dict] = []
+    while len(selected) < limit:
+        added = False
+        for query_type in TYPE_PRIORITY:
+            bucket = by_type.get(query_type)
+            if bucket:
+                selected.append(bucket.pop(0))
+                added = True
+                if len(selected) >= limit:
+                    break
+        if not added:
+            break
+    return selected
