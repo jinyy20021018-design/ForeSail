@@ -234,3 +234,32 @@ body { background: #C7CBD2; padding: 22px; }
 .rc-stage-map .leaflet-control-zoom a:hover { background: #2a3350; color: #fff; }
 .rc-stage-map .leaflet-control-attribution { border-radius: 999px 0 0 0; padding: 2px 9px; font-size: 8px; }
 .rc-stage-map .leaflet-control-scale { margin-bottom: 8px; margin-left: 8px; }
+
+/* ============================================================
+   P4 · Case Library — floating card rows + soft KPI cards
+   ============================================================ */
+.summary-card { border-radius: 20px; transition: transform .2s var(--ease-product, ease), box-shadow .2s; }
+.summary-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(20, 20, 20, .09); }
+.summary-icon { border-radius: 14px; }
+
+/* panel becomes a transparent rail; each row is its own capsule card */
+.case-list-panel { background: transparent; box-shadow: none; padding: 0; overflow: visible; }
+.case-list { border-top: 0; display: flex; flex-direction: column; gap: 10px; }
+.case-list-head { background: transparent; padding: 0 22px 2px; }
+.case-list-row,
+.case-list-head + .case-list-row {
+  border: 0; border-top: 0;
+  border-radius: 16px;
+  min-height: 108px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  transition: transform .18s var(--ease-product, ease), box-shadow .18s, background .18s;
+}
+.case-list-row:hover { background: #fff; box-shadow: 0 6px 18px rgba(20, 20, 20, .08); transform: translateY(-1px); }
+.case-open-button {
+  border: 0; border-radius: 999px;
+  width: 34px; height: 34px;
+  background: var(--black); color: #fff;
+}
+.case-list-row:hover .case-open-button { background: #1f242e; transform: translateX(2px); }
+.queue-metric { border-right-color: var(--border); }
