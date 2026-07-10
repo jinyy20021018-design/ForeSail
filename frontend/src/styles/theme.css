@@ -263,3 +263,19 @@ body { background: #C7CBD2; padding: 22px; }
 }
 .case-list-row:hover .case-open-button { background: #1f242e; transform: translateX(2px); }
 .queue-metric { border-right-color: var(--border); }
+
+/* ============================================================
+   P5 · Create Case — capsule stepper + soft panels
+   ============================================================ */
+.create-progress { border: 0; border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.create-progress > div { border-right-color: var(--border); }
+.create-progress > div > span { border: 0; }
+.create-progress .active { background: var(--blue-soft); }
+.create-progress .active > span { background: var(--black); color: #fff; }
+.create-progress .complete > span { background: var(--green); }
+.create-upload-panel { border-radius: 20px; }
+.create-panel-heading, .create-upload-footer { border-color: var(--border); }
+.create-upload-footer { background: var(--card2); }
+.upload-format-tag { border-radius: 999px; padding: 6px 12px; }
+.document-slot { border-radius: 0; }
+.file-picker { border-radius: var(--r-sm); }
