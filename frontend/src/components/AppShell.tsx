@@ -10,7 +10,7 @@ type Props = {
   onToggleLanguage: () => void;
 };
 
-export function AppShell({ activePath, children, language, onNavigate, onToggleLanguage }: Props) {
+export function AppShell({ activePath, children, onNavigate }: Props) {
   return (
     <div className="app-shell">
       <div className="app-frame">
@@ -27,10 +27,10 @@ export function AppShell({ activePath, children, language, onNavigate, onToggleL
             <button className="fsnav-icon" type="button" aria-label="Help">
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3.5M12 17h.01" /></svg>
             </button>
-            <button className="fsnav-lang" type="button" onClick={onToggleLanguage} aria-label="Switch language">
+            <div className="fsnav-lang" aria-label="Language: English">
               <span aria-hidden="true" />
-              <small>{language === "en" ? "EN" : "中文"} ▾</small>
-            </button>
+              <small>EN</small>
+            </div>
           </div>
         </nav>
         <main className="shell-main">{children}</main>

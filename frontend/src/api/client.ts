@@ -285,6 +285,7 @@ export type VoyagePosition = {
   lat: number;
   lng: number;
   region: string;
+  status?: "pre_departure" | "en_route" | "arrived";
 };
 
 export type TyphoonTrackPoint = {

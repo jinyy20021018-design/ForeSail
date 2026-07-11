@@ -268,7 +268,7 @@ function TimelineLanes({ tradeCase, hazards }: { tradeCase: TradeCase; hazards: 
       <div className="lane"><span className="ln">Deadline</span>
         <div className="track">
           {deadlines.map((d, i) => (
-            <div key={i} className="flag" style={{ left: `${d.pct}%`, background: d.color }}>
+            <div key={i} className={`flag${d.pct > 55 ? " flag-end" : ""}${i % 2 ? " flag-low" : ""}`} style={{ left: `${d.pct}%`, background: d.color }}>
               <b style={{ color: d.color }}>{d.label}</b>
             </div>
           ))}

@@ -33,7 +33,7 @@ export function RouteLeafletMap({ routeMap, tradeCase }: Props) {
     const inlandLeg = routeMap.geometry.legs.find((leg) => leg.type === "inland");
     const route: LatLngExpression[] = seaLeg?.coordinates?.length ? seaLeg.coordinates : routeMap.geometry.coordinates.length ? routeMap.geometry.coordinates : [start, end];
 
-    const map = L.map(containerRef.current, { attributionControl: true, scrollWheelZoom: false, zoomControl: true, minZoom: 2 });
+    const map = L.map(containerRef.current, { attributionControl: true, scrollWheelZoom: true, dragging: true, zoomControl: true, minZoom: 2 });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
@@ -141,9 +141,15 @@ export function RouteLeafletMap({ routeMap, tradeCase }: Props) {
 
     const vessel = routeMap.vessel_position;
     if (vessel) {
+      const vesselLabel =
+        vessel.status === "pre_departure"
+          ? `Vessel · berthed at ${loadingPort} · ETD ${shortDate(vessel.date)}`
+          : vessel.status === "arrived"
+          ? `Vessel · arrived ${dischargePort}`
+          : `Vessel (est.) · ${shortDate(vessel.date)} · ${vessel.region}`;
       L.marker([vessel.lat, vessel.lng], { icon: L.divIcon({ className: "vessel-marker", html: "🚢", iconSize: [22, 22], iconAnchor: [11, 11] }) })
         .addTo(map)
-        .bindTooltip(`Vessel (est.) · ${vessel.date} · ${vessel.region}`, { permanent: true, direction: "top", className: "route-map-label", offset: [0, -12] });
+        .bindTooltip(vesselLabel, { permanent: true, direction: "top", className: "route-map-label", offset: [0, -12] });
       boundsPoints.push([vessel.lat, vessel.lng]);
     }
 

@@ -147,7 +147,7 @@ body { background: #C7CBD2; padding: 22px; }
 .app-shell { min-height: auto; }
 
 .app-frame {
-  max-width: 1300px;
+  max-width: 1760px;
   margin: 0 auto;
   padding: 20px 26px 30px;
   border-radius: 32px;
@@ -315,3 +315,17 @@ body { background: #C7CBD2; padding: 22px; }
 
 /* agent run history: selected row uses misty blue (already via token) */
 .run-list > div.selected, .selected-row, .inline-evidence-row td { border-radius: 0; }
+
+/* ============================================================
+   Fixups (user feedback round 2)
+   ============================================================ */
+/* Buyer/Seller segmented control → capsule, white active pill */
+.perspective-toggle { border: 0; border-radius: 999px; padding: 4px; background: var(--card2); box-shadow: 0 1px 3px rgba(20, 20, 20, .05); }
+.perspective-toggle button { border: 0; border-radius: 999px; }
+.perspective-toggle button.active { border: 0; background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(20, 20, 20, .12); }
+
+/* Timeline deadline flags: keep labels inside the card, stagger to avoid overlap */
+.fs2-overview .lanewrap { overflow: hidden; }
+.fs2-overview .lane:last-child { min-height: 34px; }
+.fs2-overview .flag.flag-end b { left: auto; right: 6px; text-align: right; }
+.fs2-overview .flag.flag-low b { top: auto; bottom: -2px; }

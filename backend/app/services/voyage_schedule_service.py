@@ -53,9 +53,19 @@ def build_voyage_schedule(case: dict) -> dict:
 
 
 def position_on(schedule: dict, target: date) -> dict | None:
-    for position in schedule.get("positions", []):
-        if position["date"] == target.isoformat():
-            return position
+    positions = schedule.get("positions", [])
+    if not positions:
+        return None
+    target_iso = target.isoformat()
+    for position in positions:
+        if position["date"] == target_iso:
+            return {**position, "status": "en_route"}
+    # Clamp outside the voyage window so the vessel is always plotted:
+    # before ETD it waits at the loading port, after ETA it sits at discharge.
+    if target_iso < positions[0]["date"]:
+        return {**positions[0], "status": "pre_departure"}
+    if target_iso > positions[-1]["date"]:
+        return {**positions[-1], "status": "arrived"}
     return None
 
 
