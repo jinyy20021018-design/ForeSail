@@ -33,7 +33,7 @@ export function RouteLeafletMap({ routeMap, tradeCase }: Props) {
     const inlandLeg = routeMap.geometry.legs.find((leg) => leg.type === "inland");
     const route: LatLngExpression[] = seaLeg?.coordinates?.length ? seaLeg.coordinates : routeMap.geometry.coordinates.length ? routeMap.geometry.coordinates : [start, end];
 
-    const map = L.map(containerRef.current, { attributionControl: true, scrollWheelZoom: true, dragging: true, zoomControl: true, minZoom: 2 });
+    const map = L.map(containerRef.current, { attributionControl: true, scrollWheelZoom: false, dragging: true, doubleClickZoom: true, zoomControl: true, minZoom: 2 });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
