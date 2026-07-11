@@ -1,7 +1,6 @@
-import json
-from itertools import count
+﻿import json
 
-from app.services.action_board_service import generate_actions
+from app.services.action_board_service import earliest_action_deadline, generate_actions
 from app.services.action_draft_service import generate_action_drafts
 from app.services.agent_summary_service import generate_agent_summary_result
 from app.services.case_service import (
@@ -10,7 +9,16 @@ from app.services.case_service import (
     get_watch_profile,
     set_monitoring_outputs,
 )
-from app.services.agent_run_service import save_agent_run
+from app.services.agent_run_service import get_agent_runs, save_agent_run
+from app.services.corridor_risk_service import (
+    corridors_for_case,
+    seasonal_baseline,
+    update_corridor_states,
+    update_port_states,
+)
+from app.services.hazard_service import apply_hazard_delta, build_hazards, corridor_hazards, hazard_ids_for_events
+from app.services.policy_registry_service import match_policies_for_case
+from app.services.voyage_schedule_service import build_voyage_schedule
 from app.services.document_service import (
     get_best_case_facts,
     get_field_conflicts,
@@ -26,12 +34,10 @@ from app.services.relevance_engine import classify_events
 from app.services.risk_mapper import summarize_exposures
 from app.services.treatment_plan_service import generate_approval_package, generate_treatment_plans
 
-_run_counter = count(1)
-
 
 class MonitoringAgent:
     def run_monitoring_cycle(self, case_id: str) -> dict:
-        agent_run_id = f"RUN-{next(_run_counter):03d}"
+        agent_run_id = f"RUN-{len(get_agent_runs(case_id)) + 1:03d}"
         trace: list[dict] = []
 
         case = get_case(case_id)
@@ -74,6 +80,11 @@ class MonitoringAgent:
                 "case": case,
                 "watch_profile": get_watch_profile(case_id),
                 "relevance_results": [],
+                "hazards": [],
+                "hazard_delta": {"new": [], "escalated": [], "ongoing": [], "resolved": [], "all_clear": True},
+                "earliest_action_deadline": None,
+                "corridor_states": [],
+                "port_states": [],
                 "risk_summary": {"triggered": False, "trigger_events": [], "watch_events_considered": [], "exposures": []},
                 "obligations": [],
                 "information_gaps": [],
@@ -212,7 +223,7 @@ class MonitoringAgent:
         if ingestion_result["mode"] == "REAL" and ingestion_result["events_deduped_count"] == 0:
             trace.append(
                 _trace_step(
-                    11,
+                    len(trace) + 1,
                     "Real Mode Event Warning",
                     "REAL mode returned zero external events. Check connector env flags, network access, and watch profile locations.",
                     "event_ingestion_service",
@@ -222,23 +233,95 @@ class MonitoringAgent:
             )
 
         relevance_results = classify_events(facts, events)
+        hazards, relevance_results = build_hazards(facts, events, relevance_results)
         relevant_count = _count(relevance_results, "Relevant")
         watch_count = _count(relevance_results, "Watch")
         irrelevant_count = _count(relevance_results, "Irrelevant")
         trace.append(
             _trace_step(
-                11,
+                len(trace) + 1,
                 "Classify Event Relevance",
-                "Classified each event using deterministic relevance scoring.",
+                "Classified each event using deterministic relevance scoring with Incoterms attribution, confidence weighting, and forecast-horizon decay.",
                 "relevance_engine",
                 f"{relevant_count} Relevant, {watch_count} Watch, {irrelevant_count} Irrelevant.",
             )
         )
 
-        risk_summary = summarize_exposures(facts, events, relevance_results)
+        voyage_schedule = build_voyage_schedule(facts)
+        corridor_states = update_corridor_states(events)
+        case_corridors = corridors_for_case(facts, voyage_schedule)
+        port_states = update_port_states(watch_profile.get("watched_ports") or [], events, [event for event in events if event.get("calendar_based")])
         trace.append(
             _trace_step(
-                12,
+                len(trace) + 1,
+                "Assess Corridor & Port Risk States",
+                "Updated corridor and port risk state machines from current events and mapped the states onto this route.",
+                "corridor_risk_service",
+                f"{sum(1 for state in case_corridors if state['state'] != 'GREEN')} of {len(case_corridors)} corridors on route above GREEN; {sum(1 for state in port_states if state['state'] != 'GREEN')} watched ports above GREEN.",
+            )
+        )
+
+        policy_matches = match_policies_for_case(facts, voyage_schedule)
+        trace.append(
+            _trace_step(
+                len(trace) + 1,
+                "Match Policy Registry",
+                "Matched the case (origin, destination, commodity, transit regions) against the deterministic policy registry.",
+                "policy_registry_service",
+                f"{len(policy_matches['active_policies'])} active policies apply; {len(policy_matches['pending_policy_events'])} pending policy measures on the horizon.",
+            )
+        )
+
+        hazards.extend(corridor_hazards(facts, case_corridors))
+        corroborated_count = sum(1 for hazard in hazards if hazard.get("corroborated"))
+        trace.append(
+            _trace_step(
+                len(trace) + 1,
+                "Correlate Hazards",
+                "Clustered related events into hazard objects, corroborated multi-source evidence, gated single low-confidence sources, and added corridor-state hazards.",
+                "hazard_service",
+                f"{len(hazards)} hazards identified ({corroborated_count} corroborated by multiple sources).",
+            )
+        )
+        hazard_delta = apply_hazard_delta(case_id, hazards)
+        trace.append(
+            _trace_step(
+                len(trace) + 1,
+                "Compute Hazard Delta",
+                "Compared hazards against the previous run to detect new, escalated, ongoing, and resolved threats.",
+                "hazard_service",
+                f"{len(hazard_delta['new'])} new, {len(hazard_delta['escalated'])} escalated, {len(hazard_delta['ongoing'])} ongoing, {len(hazard_delta['resolved'])} resolved.",
+            )
+        )
+
+        risk_summary = summarize_exposures(facts, events, relevance_results)
+        perspective = str(facts.get("trade_perspective") or case.get("trade_perspective") or "SELLER").upper()
+        for policy in policy_matches["active_policies"]:
+            risk_summary["exposures"].append(
+                {
+                    "category": "Trade Compliance",
+                    "impact": policy["note"] or "Active trade policy applies to this shipment.",
+                    "severity": "High" if str(policy.get("severity")).upper() == "HIGH" else "Medium",
+                    "party_perspective": perspective,
+                    "affected_party": perspective,
+                    "responsible_party": "SHARED",
+                    "incoterm_basis": facts.get("incoterm") or "",
+                    "cif_scenario": "standing_policy",
+                    "evidence_event_ids": [],
+                    "trigger_event_ids": [],
+                    "watch_event_ids": [],
+                    "policy_id": policy["policy_id"],
+                    "policy_title": policy["title"],
+                }
+            )
+        for exposure in risk_summary["exposures"]:
+            exposure["hazard_ids"] = hazard_ids_for_events(hazards, exposure.get("evidence_event_ids") or [])
+        risk_summary["hazard_ids"] = [hazard["hazard_id"] for hazard in hazards]
+        risk_summary["background_risks"] = seasonal_baseline(voyage_schedule)
+        risk_summary["active_policies"] = policy_matches["active_policies"]
+        trace.append(
+            _trace_step(
+                len(trace) + 1,
                 "Map Exposures",
                 "Mapped Relevant and Watch events to case-level risk exposure categories.",
                 "risk_mapper",
@@ -248,7 +331,7 @@ class MonitoringAgent:
         cif_responsibility = resolve_cif_responsibility(facts)
         trace.append(
             _trace_step(
-                13,
+                len(trace) + 1,
                 "Resolve CIF Responsibilities",
                 "Resolved deterministic CIF buyer/seller responsibility matrix and risk transfer point.",
                 "incoterm_rule_service",
@@ -267,7 +350,7 @@ class MonitoringAgent:
         )
         trace.append(
             _trace_step(
-                14,
+                len(trace) + 1,
                 "Apply Buyer/Seller Perspective",
                 "Applied the selected trade perspective to CIF exposure, obligation, action, and treatment outputs.",
                 "perspective_service",
@@ -280,7 +363,7 @@ class MonitoringAgent:
         obligations_at_risk = [obligation for obligation in obligations if "risk" in obligation["current_assessment"].lower()]
         trace.append(
             _trace_step(
-                15,
+                len(trace) + 1,
                 "Map Obligations & Deadlines",
                 "Mapped confirmed facts and risk results to preliminary operational obligation and deadline assessments.",
                 "obligation_service",
@@ -292,7 +375,7 @@ class MonitoringAgent:
         set_information_gaps(case_id, information_gaps)
         trace.append(
             _trace_step(
-                16,
+                len(trace) + 1,
                 "Detect Information Gaps",
                 "Detected missing confirmations that may block operational decisions.",
                 "information_gap_service",
@@ -300,22 +383,23 @@ class MonitoringAgent:
             )
         )
 
-        actions = generate_actions(risk_summary)
+        actions = generate_actions(risk_summary, facts, obligations)
+        next_action_deadline = earliest_action_deadline(actions)
         trace.append(
             _trace_step(
-                17,
+                len(trace) + 1,
                 "Generate CIF-specific Actions",
-                "Generated deduplicated recommended actions from aggregated exposures and CIF buyer/seller perspective.",
+                "Generated deduplicated recommended actions with deadlines back-calculated from obligation dates.",
                 "action_board_service",
-                f"{len(actions)} recommended actions generated.",
+                f"{len(actions)} recommended actions generated; earliest action deadline {next_action_deadline or 'n/a'}.",
             )
         )
 
-        action_drafts = generate_action_drafts(case_id, facts, risk_summary, actions)
+        action_drafts = generate_action_drafts(case_id, facts, risk_summary, actions, hazards)
         set_action_drafts(case_id, action_drafts)
         trace.append(
             _trace_step(
-                18,
+                len(trace) + 1,
                 "Generate Action Drafts",
                 "Generated draft outbound/internal messages for user review. Nothing was sent externally.",
                 "action_draft_service",
@@ -323,15 +407,15 @@ class MonitoringAgent:
             )
         )
 
-        set_monitoring_outputs(case_id, relevance_results, risk_summary, actions)
+        set_monitoring_outputs(case_id, relevance_results, risk_summary, actions, hazard_delta)
         updated_case = get_case(case_id)
         status_after = updated_case["status"]
         status_timeline = get_timeline(case_id)
         trace.append(
             _trace_step(
-                19,
+                len(trace) + 1,
                 "Update Case Status",
-                "Updated case status through the existing deterministic status machine.",
+                "Updated case status through the deterministic status machine (escalation and all-clear de-escalation).",
                 "status_machine",
                 f"Case moved from {status_before} to {status_after}.",
             )
@@ -343,7 +427,7 @@ class MonitoringAgent:
             treatment_output = generate_treatment_plans(case_id)
             trace.append(
                 _trace_step(
-                    20,
+                    len(trace) + 1,
                     "Generate CIF-specific Treatment Plan Summary",
                     "Generated structured CIF treatment plan options from current exposures, obligations, gaps, actions, and perspective.",
                     "treatment_plan_service",
@@ -352,7 +436,7 @@ class MonitoringAgent:
             )
             trace.append(
                 _trace_step(
-                    21,
+                    len(trace) + 1,
                     "Generate Treatment Plans",
                     "Generated structured risk treatment plan options from current exposures, obligations, gaps, and actions.",
                     "treatment_plan_service",
@@ -361,7 +445,7 @@ class MonitoringAgent:
             )
             trace.append(
                 _trace_step(
-                    22,
+                    len(trace) + 1,
                     "Generate Residual Risk Summary",
                     "Generated residual risk summaries for each treatment plan.",
                     "treatment_plan_service",
@@ -375,7 +459,7 @@ class MonitoringAgent:
                 approval_summary = "No recommended treatment plan available for approval package."
             trace.append(
                 _trace_step(
-                    23,
+                    len(trace) + 1,
                     "Generate Approval Summary Draft",
                     "Generated a structured approval summary draft for the recommended treatment plan.",
                     "treatment_plan_service",
@@ -384,7 +468,7 @@ class MonitoringAgent:
             )
             trace.append(
                 _trace_step(
-                    24,
+                    len(trace) + 1,
                     "Persist Treatment Outputs",
                     "Persisted treatment plans, residual risks, and approval package data for the case.",
                     "persistence_service",
@@ -394,7 +478,7 @@ class MonitoringAgent:
         except Exception as error:
             trace.append(
                 _trace_step(
-                    20,
+                    len(trace) + 1,
                     "Generate CIF-specific Treatment Plan Summary",
                     "Attempted to generate treatment plans after agent monitoring outputs.",
                     "treatment_plan_service",
@@ -464,6 +548,11 @@ class MonitoringAgent:
             "case": updated_case,
             "watch_profile": watch_profile,
             "relevance_results": relevance_results,
+            "hazards": hazards,
+            "hazard_delta": hazard_delta,
+            "earliest_action_deadline": next_action_deadline,
+            "corridor_states": case_corridors,
+            "port_states": port_states,
             "risk_summary": risk_summary,
             "obligations": obligations,
             "information_gaps": information_gaps,

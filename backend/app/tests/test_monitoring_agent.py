@@ -26,8 +26,8 @@ class MonitoringAgentTest(unittest.TestCase):
         self.assertEqual(result["status_before"], "ACTIVE")
         self.assertEqual(result["status_after"], "ACTION_REQUIRED")
         self.assertEqual(result["events_scanned"], 5)
-        self.assertEqual(result["relevant_count"], 2)
-        self.assertEqual(result["watch_count"], 1)
+        self.assertEqual(result["relevant_count"], 3)
+        self.assertEqual(result["watch_count"], 0)
         self.assertEqual(result["irrelevant_count"], 2)
         self.assertEqual(result["case"]["status"], "ACTION_REQUIRED")
 
@@ -102,7 +102,7 @@ class MonitoringAgentTest(unittest.TestCase):
             self.assertEqual(result["summary_source"], "deterministic_fallback")
             self.assertTrue(result.get("summary_warning"))
             self.assertTrue(result["llm_required"])
-            self.assertEqual(result["relevant_count"], 2)
+            self.assertEqual(result["relevant_count"], 3)
             self.assertIn("Agent scanned 5 external events", result["summary"])
         finally:
             os.environ.pop("REQUIRE_LLM_AGENT", None)

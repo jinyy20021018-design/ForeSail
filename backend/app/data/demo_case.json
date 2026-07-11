@@ -12,5 +12,9 @@
   "payment_method": "LC at sight",
   "incoterm": "CIF",
   "incoterm_named_place": "Chittagong",
-  "trade_perspective": "SELLER"
+  "trade_perspective": "SELLER",
+  "amount": 186000,
+  "currency": "USD",
+  "lc_expiry_date": "2026-12-21",
+  "presentation_period_days": 21
 }

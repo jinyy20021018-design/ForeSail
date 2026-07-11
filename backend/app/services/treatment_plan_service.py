@@ -220,9 +220,23 @@ def update_approval_status(case_id: str, approval_package_id: str, status: str, 
 def _build_plan(case_id: str, plan_id: str, plan_type: str, recommended_type: str, inputs: dict) -> dict:
     now = _now()
     profile = _plan_profile(plan_type, inputs)
-    linked_actions = [action.get("action_id") for action in inputs["actions"] if action.get("action_id")]
+    covered_exposures = set(inputs["exposures"])
+    linked_actions = [
+        action.get("action_id")
+        for action in inputs["actions"]
+        if action.get("action_id") and (not covered_exposures or action.get("related_exposure") in covered_exposures)
+    ]
     linked_gaps = [gap.get("gap_id") for gap in inputs["gaps"] if gap.get("gap_id")]
-    linked_obligations = [obligation.get("obligation_id") for obligation in inputs["obligations"] if obligation.get("obligation_id")]
+    linked_obligations = [
+        obligation.get("obligation_id")
+        for obligation in inputs["obligations"]
+        if obligation.get("obligation_id") and (plan_type == "MAX_PROTECTION" or obligation.get("severity") == "High")
+    ]
+    hazard_ids = list(dict.fromkeys(
+        hazard_id
+        for obligation in inputs["obligations"]
+        for hazard_id in (obligation.get("hazard_ids") or [])
+    ))
     residual_risks = _residual_risks(case_id, plan_id, plan_type, inputs)
     rationale = profile["rationale"]
     if inputs["warning"]:
@@ -247,6 +261,9 @@ def _build_plan(case_id: str, plan_id: str, plan_type: str, recommended_type: st
         "linked_action_ids": linked_actions,
         "linked_gap_ids": linked_gaps,
         "linked_obligation_ids": linked_obligations,
+        "hazard_ids": hazard_ids,
+        "amount_at_risk": inputs["facts"].get("amount"),
+        "amount_at_risk_currency": inputs["facts"].get("currency"),
         "assumptions": profile["assumptions"],
         "preconditions": profile["preconditions"],
         "recheck_triggers": profile["recheck_triggers"],

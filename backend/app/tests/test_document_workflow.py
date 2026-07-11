@@ -206,7 +206,8 @@ class DocumentWorkflowTest(unittest.TestCase):
         obligation_names = {obligation["name"] for obligation in result["obligations"]}
         self.assertIn("Latest Shipment Date", obligation_names)
         latest = next(obligation for obligation in result["obligations"] if obligation["name"] == "Latest Shipment Date")
-        self.assertEqual(latest["current_assessment"], "At risk due to vessel delay")
+        self.assertIn("At risk", latest["current_assessment"])
+        self.assertEqual(latest["severity"], "High")
 
     def test_no_llm_api_key_extraction_fallback_works(self) -> None:
         os.environ["USE_LLM_EXTRACTION"] = "true"

@@ -115,6 +115,8 @@ def _try_llm_extract(item: dict, watch_profile: dict) -> dict | None:
         "Extract one normalized shipping/trade disruption event from this news/RSS item as JSON. "
         "Allowed event_type: VESSEL_DELAY, PORT_DISRUPTION, WEATHER, SECURITY, GEOPOLITICAL, TRADE_POLICY, ROUTE_DISRUPTION, UNKNOWN. "
         "Allowed severity: LOW, MEDIUM, HIGH, CRITICAL, UNKNOWN. "
+        "If the text states when the disruption will take effect or end (e.g. a planned strike date), "
+        "include expected_impact_window as {\"start\": ISO-date, \"end\": ISO-date}. "
         "Do not decide relevance classification, risk level, case status, or treatment plan gating.\n"
         f"Watch profile: {json.dumps(watch_profile, ensure_ascii=True)}\n"
         f"Title: {rss_item.get('title')}\nSummary: {rss_item.get('summary')}"
@@ -143,7 +145,7 @@ def _try_llm_extract(item: dict, watch_profile: dict) -> dict | None:
         fallback = _keyword_extract(item, watch_profile)
         if not fallback:
             return None
-        fallback.update({key: parsed[key] for key in ["event_type", "title", "description", "locations", "affected_ports", "affected_vessels", "severity"] if key in parsed})
+        fallback.update({key: parsed[key] for key in ["event_type", "title", "description", "locations", "affected_ports", "affected_vessels", "severity", "expected_impact_window"] if key in parsed})
         fallback["confidence"] = min(1.0, float(parsed.get("confidence", fallback["confidence"])))
         fallback["raw_payload"]["llm_used"] = True
         return fallback

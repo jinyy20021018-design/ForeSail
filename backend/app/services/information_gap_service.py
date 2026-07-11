@@ -1,5 +1,4 @@
 def detect_information_gaps(case_id: str, facts: dict, relevance_results: list[dict]) -> list[dict]:
-    relevant_ids = {result["event_id"] for result in relevance_results if result["classification"] == "Relevant"}
     watch_or_relevant_exposures = {
         exposure
         for result in relevance_results
@@ -8,7 +7,7 @@ def detect_information_gaps(case_id: str, facts: dict, relevance_results: list[d
     }
     gaps: list[dict] = []
 
-    if "EVT-001" in relevant_ids or "Shipping" in watch_or_relevant_exposures:
+    if "Shipping" in watch_or_relevant_exposures:
         gaps.append(_gap(case_id, "Need confirmed updated ETA from carrier", "Current ETA delay is based on event feed and requires carrier confirmation before LC amendment decision.", "LC amendment timing", "Logistics", "High"))
 
     if not facts.get("booking_reference"):
@@ -20,7 +19,7 @@ def detect_information_gaps(case_id: str, facts: dict, relevance_results: list[d
     if not facts.get("presentation_period_days"):
         gaps.append(_gap(case_id, "Need LC presentation period confirmation", "Presentation period is missing from confirmed facts.", "Document presentation timing", "Trade Finance", "High"))
 
-    if "EVT-002" in relevant_ids or "Port Operation" in watch_or_relevant_exposures:
+    if "Port Operation" in watch_or_relevant_exposures:
         gaps.append(_gap(case_id, "Need latest port operation status from freight forwarder", "Bangladesh / Chittagong port disruption requires current local operational confirmation.", "Discharge and inland delivery planning", "Freight Forwarder", "High"))
 
     return gaps

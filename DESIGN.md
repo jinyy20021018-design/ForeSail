@@ -1,49 +1,56 @@
-# ForeSail DESIGN.md
+# ForeSail DESIGN.md — Freight Studio
 
-Visual system for the ForeSail trade-risk app. Register: **product** (dashboard/tool). **Light theme**, bright royal-blue accent (#2563EB), cool tinted neutrals, near-white fact cards, soft semantic icon circles, with a **dark-navy Route Risk Map panel** for contrast. Matches the user's approved hi-fi mockups. UI language: **English**. No magenta.
+Visual system for the ForeSail trade-risk app. Register: **product / command deck**.
+A **floating rounded canvas on a soft gray desk**, near-white cards, **999px capsules**
+everywhere (buttons, tabs, chips, badges), a **black accent** for the single primary CTA,
+misty semantic colors, and one **dark real map** as the deliberate contrast island.
+UI language: **English**. Source of truth for pixels: `frontend/prototype/restyle/foresail-overview-demo.html`.
 
-## Color (OKLCH, light, deep-navy accent)
+## Color (Freight Studio palette)
 
-Strategy: **Restrained** — near-white fact surfaces, a cool-gray page canvas, and one royal-blue accent for primary/selection/links. Red/amber/green are reserved for semantic status and icon circles (color + icon + text, color-blind safe). Never `#000`/`#fff`; neutrals are tinted toward hue 262.
-
-```css
---bg:          oklch(0.985 0.004 255);  /* page background, very light cool gray */
---s1:          oklch(1 0 0);            /* white surface */
---s2:          oklch(0.975 0.005 255);  /* subtle gray */
---s3:          oklch(0.955 0.006 255);
---border:      oklch(0.91 0.006 255);
---border2:     oklch(0.85 0.010 255);
---text:        oklch(0.27 0.022 262);   /* dark slate */
---muted:       oklch(0.52 0.020 262);
---faint:       oklch(0.66 0.015 262);
---accent:      oklch(0.42 0.115 262);   /* DEEP NAVY/INDIGO: primary, links, selection */
---accent2:     oklch(0.34 0.120 264);   /* hover (darker) */
---accent-soft: oklch(0.42 0.115 262 / 0.10);
-
-/* risk STATUS only */
---danger:  oklch(0.55 0.205 25);   /* AT_RISK / critical 🔴 */
---warn:    oklch(0.66 0.150 62);   /* watch / due-soon 🟠 */
---ok:      oklch(0.58 0.135 155);  /* clear / ok 🟢 */
 ```
-Seat coloring on map/axis: our seat = `--accent` (solid); counterparty = `--faint` (dashed, "contract-derived").
-Shadows: nearly flat — `0 1px 2px` at ~4% alpha. Prefer borders and tinted surfaces over floating cards.
+--canvas: #EBEDF1   /* app-frame canvas */          desk (body): #C7CBD2
+--card:   #FAFBFD   /* surfaces */        --card2:  #F0F2F7  /* inset strips */
+--ink:    #2C323B   /* text */            --black:  #2E3542  /* primary CTA, active tab/step */
+--muted:  #747B88                         --faint:  #A5ACB9
+--red:    #C4747C / #F3EBED (soft)   AT_RISK / ACTION_REQUIRED / your-risk
+--amber:  #C69D66 / #F3EEE4 (soft)   watch / due-soon
+--blue:   #5F7FD0 / #E8EDF8 (soft)   links, selection, counterparty
+--green:  #67A08E / #E8F0EC (soft)   clear / complete / ok
+```
+Status is always **color + label** in a capsule, never color alone. Semantic red/amber/green
+are reserved for status; blue is selection/links/counterparty.
 
-## Typography
-- `Inter, "Segoe UI", system-ui, sans-serif`. One family. Tabular nums for money/dates/countdowns.
-- Fixed rem scale ~1.2; weights 400/600/700/800 for hierarchy. Prose ≤72ch; tables can run dense.
+## Type
+`"Plus Jakarta Sans"` (self-hosted via `@fontsource`, weights 400–800), falling back to
+`-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei"`. Tabular nums for money/dates/countdowns.
 
-## Layout
-- **IA (confirmed with user):** Page 1 = **Case Library / Overview** (summary cards + search/filter + cases table). Click a case → **Case Workspace**: **Overview first** (Verdict + Case Snapshot + Watch Profile + Route Risk Map + Liability strip), **then the agent pipeline runs in order** (External Events → Relevance → Risks & Obligations → Actions & Drafts → Treatment Plans → Agent Trace), each explicit/expandable.
-- No redundant left nav inside a case (pipeline stages ARE the structure; breadcrumb back to Library). Cross-case snapshot lives on Library.
-- Radius 5px for badges, 8px for controls, 10px for surfaces, 12px only for the dark map; spacing 4/8/12/16/24; vary for rhythm.
+## Shape & elevation
+- Radius: **26** hero panels, **20** cards, **16** medium, **10** inputs, **999px** all pills.
+- App frame: `max-width 1300`, radius 32, radial-gradient highlights, `0 24px 80px` shadow.
+- Elevation is **shadow, not border**: `--shadow: 0 2px 10px rgba(20,20,20,.05)`. Avoid hard borders on cards.
 
-## Components & motion
-- Every control: default/hover/focus/active/disabled. Status = badge (dot + icon + label), never color alone.
-- 150–250ms ease-out. Countdown pulses, agent trace streams. Don't animate layout props.
+## Components
+- **Buttons**: primary = **black pill** (one hero CTA per view); secondary/ghost = **white card pill**.
+- **Tabs**: capsule; active = black fill, white text (top `.fsnav` app-mode nav and the 9 `.fs2-tabs` workspace tabs).
+- **Badges / chips / status pills / classification**: 999px capsule on a `-soft` tint.
+- **Inputs / selects**: radius 10, light border, card fill.
+- **Case rows**: individual floating capsule cards on a transparent rail; open button = black circle.
 
-## Signature components
-1. **Route Risk Map** — stylized light SVG (not Leaflet): navy route, faint grid, events plotted with pulse, Incoterm transfer point ◆; our-seat leg solid+navy, counterparty dashed+faint. (CIF: transfer at loading → seller leg tiny, main voyage is buyer's.)
-2. **Liability strip (Incoterms)** — risk/cost/obligation lanes along the voyage with the transfer point.
+## Signature layout
+- **Overview command deck** (`WorkspaceOverview` + scoped `fs2-overview.css`): hazard flight-cards row,
+  countdown card, black "Next actions" checklist card, Route Risk Deck, shipment info, exposure flag chips.
+- **Route Risk Deck** (`RouteChart` → `RouteLeafletMap`): the **Map** segment is the **real Leaflet map**
+  (CARTO dark basemap + route legs, ports, event markers, typhoon cones/track, corridor states, vessel);
+  Legs/Weather segments keep the schematic SVG. The dark map is embedded in the light deck via
+  `isolation:isolate` (rounded-corner clip) with circular dark-glass zoom controls.
 
-## Bans (project)
-No magenta. No garish bright blue (use deep navy). No left-sidebar nav inside case. No per-field approve grind (default-accept + exception-review). No side-stripe borders, gradient text, hero-metric cliché. UI copy in English.
+## CSS architecture
+Layers load in order (`main.tsx`): fonts → `styles.css` (legacy) → `normalized.css` (structure +
+`!important`) → **`styles/theme.css`** (global Freight Studio layer: re-points legacy tokens, reshapes
+shared components into capsules) + scoped `styles/fs2-overview.css` (Overview only, untouched).
+To restyle globally, edit `theme.css`; structural grids/list rows live in `normalized.css`.
+
+## Bans
+No hard-bordered cards. No bright royal blue (use misty `#5F7FD0`). No color-only status.
+No fake stylized "map" for the Map segment — the real Leaflet map is primary. UI copy in English.

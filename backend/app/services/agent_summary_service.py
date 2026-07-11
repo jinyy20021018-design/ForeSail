@@ -247,7 +247,7 @@ def _format_openai_error(error: Exception) -> str:
             message = parsed.get("error", {}).get("message")
             if message:
                 return f"HTTP {error.code}: {message}"
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+        except Exception:
             pass
         return f"HTTP {error.code}: {error.reason}"
     return str(error)

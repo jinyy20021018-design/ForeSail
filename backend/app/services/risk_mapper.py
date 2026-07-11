@@ -19,12 +19,25 @@ def map_event_to_exposures(event: dict, classification: str, case: dict) -> list
         if case["port_of_loading"] in affected_ports:
             exposures.append("LC Deadline")
 
-    elif event_type == "SECURITY":
+    elif event_type in {"SECURITY", "GEOPOLITICAL"}:
         from app.services.route_region_service import event_text_mentions_corridor, merge_watched_route_regions
 
         corridors = set(merge_watched_route_regions(case))
         if event.get("affected_region") in corridors or event_text_mentions_corridor(event, corridors):
             exposures.append("Shipping")
+            if _hits_pre_transfer_leg(event, case):
+                exposures.append("LC Deadline")
+
+    elif event_type == "TRADE_POLICY":
+        exposures.append("Trade Compliance")
+        if _hits_any_leg(event, case):
+            exposures.append("Shipping")
+
+    elif event_type == "ROUTE_DISRUPTION":
+        if _hits_any_leg(event, case):
+            exposures.append("Shipping")
+            if _hits_pre_transfer_leg(event, case):
+                exposures.append("LC Deadline")
 
     elif event_type == "PORT_CONGESTION":
         affected_ports = set(event.get("affected_ports") or [])
@@ -33,6 +46,18 @@ def map_event_to_exposures(event: dict, classification: str, case: dict) -> list
             exposures.extend(["Port Operation", "Shipping"])
 
     return list(dict.fromkeys(exposures))
+
+
+def _hits_any_leg(event: dict, case: dict) -> bool:
+    from app.services.incoterm_rule_service import legs_hit_by_event
+
+    return bool(legs_hit_by_event(case, event))
+
+
+def _hits_pre_transfer_leg(event: dict, case: dict) -> bool:
+    from app.services.incoterm_rule_service import legs_hit_by_event
+
+    return any(leg in {"PRE_CARRIAGE", "PORT_OF_LOADING"} for leg in legs_hit_by_event(case, event))
 
 
 def summarize_exposures(case: dict, events: list[dict], relevance_results: list[dict]) -> dict:
@@ -90,6 +115,7 @@ def _impact_for_exposure(exposure: str) -> str:
         "LC Deadline": "Delay may create latest shipment or presentation timing risk under the LC.",
         "Port Operation": "Port disruption may slow discharge or inland delivery.",
         "Payment Timeline": "ETA or discharge delay may shift expected payment and cashflow timing.",
+        "Trade Compliance": "Sanctions, tariff, or customs policy changes may affect document compliance or clearance.",
     }
     return impacts.get(exposure, "Trade case exposure requires review.")
 

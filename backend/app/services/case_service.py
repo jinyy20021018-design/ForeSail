@@ -1,7 +1,7 @@
 import copy
 import json
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 UTC = timezone.utc
 from pathlib import Path
 
@@ -52,6 +52,8 @@ def reset_store() -> None:
         "residual_risk",
         "approval_package",
         "external_event",
+        "hazards",
+        "corridor_state",
     ]:
         clear_namespace(namespace)
 
@@ -65,12 +67,18 @@ def clear_runtime_case_cache() -> None:
     _timelines.clear()
 
 
-def create_demo_case(uploaded_files: list[str] | None = None) -> dict:
+def create_demo_case(uploaded_files: list[str] | None = None, imminent: bool = False) -> dict:
     case = _load_demo_case()
     case["case_id"] = generate_next_case_id()
     _ensure_case_defaults(case)
+    if imminent:
+        today = _today()
+        case["etd"] = (today + timedelta(days=2)).isoformat()
+        case["eta"] = (today + timedelta(days=14)).isoformat()
+        case["latest_shipment_date"] = (today + timedelta(days=5)).isoformat()
+        case["lc_expiry_date"] = (today + timedelta(days=35)).isoformat()
     case["uploaded_files"] = uploaded_files or []
-    case["case_name"] = "CAPEMOLLINI Shanghai to Dhaka Demo"
+    case["case_name"] = "CAPEMOLLINI Imminent Departure Demo" if imminent else "CAPEMOLLINI Shanghai to Dhaka Demo"
     case["buyer"] = "Demo Buyer"
     case["seller"] = "Demo Seller"
     case["commodity"] = "Cotton Yarn"
@@ -248,6 +256,7 @@ def set_monitoring_outputs(
     relevance_results: list[dict],
     risk_summary: dict,
     actions: list[dict],
+    hazard_delta: dict | None = None,
 ) -> None:
     if case_id not in _cases:
         get_case(case_id)
@@ -256,14 +265,25 @@ def set_monitoring_outputs(
 
     case = _cases[case_id]
     timeline = _timelines[case_id]
-    if can_transition(case["status"], "WATCHING"):
+    triggered = risk_summary["triggered"]
+
+    if case["status"] == "ACTIVE" and can_transition(case["status"], "WATCHING"):
         transition_case(case, "WATCHING", timeline, "Monitoring started with configured external event feed.")
 
-    if risk_summary["triggered"] and can_transition(case["status"], "AT_RISK"):
+    if triggered and can_transition(case["status"], "AT_RISK"):
         transition_case(case, "AT_RISK", timeline, "At least one Relevant event was detected.")
 
-    if actions and can_transition(case["status"], "ACTION_REQUIRED"):
+    if triggered and actions and can_transition(case["status"], "ACTION_REQUIRED"):
         transition_case(case, "ACTION_REQUIRED", timeline, "Recommended actions were generated for the triggered exposures.")
+
+    if (
+        not triggered
+        and hazard_delta is not None
+        and hazard_delta.get("all_clear")
+        and case["status"] in {"AT_RISK", "ACTION_REQUIRED"}
+        and can_transition(case["status"], "MONITORING")
+    ):
+        transition_case(case, "MONITORING", timeline, "All previously detected hazards are resolved; case returned to routine monitoring.")
 
     _results[case_id] = copy.deepcopy(relevance_results)
     _risk_summaries[case_id] = copy.deepcopy(risk_summary)
@@ -330,6 +350,10 @@ def _persist_case_bundle(case_id: str) -> None:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _today() -> date:
+    return datetime.now(UTC).date()
 
 
 def _ensure_case_defaults(case: dict) -> None:

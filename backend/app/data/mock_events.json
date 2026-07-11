@@ -42,7 +42,7 @@
     "confidence": 0.75,
     "source": "mock_weather_alert",
     "impact": "Potential departure delay near Shanghai route",
-    "expected_classification": "Watch"
+    "expected_classification": "Relevant"
   },
   {
     "event_id": "EVT-004",
