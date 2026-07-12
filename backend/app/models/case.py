@@ -20,7 +20,7 @@ class TradeCase:
     perspective_source: str = "DEFAULT"
     perspective_basis: str = ""
     uploaded_files: list[str] = field(default_factory=list)
-    mock_extraction_note: str = "Mock extracted fields for MVP. Files are not parsed in this version."
+    mock_extraction_note: str = "Pre-loaded demo case. Upload your own documents to run live extraction."
 
 
 @dataclass

@@ -229,7 +229,7 @@ export function CreateCase({ onCaseCreated, onCancel }: Props) {
           ))}
         </div>
         <div className="create-upload-footer">
-          <div><strong>{selectedFiles.length} document{selectedFiles.length === 1 ? "" : "s"} selected</strong><span>Scanned PDF OCR is not supported yet.</span></div>
+          <div><strong>{selectedFiles.length} document{selectedFiles.length === 1 ? "" : "s"} selected</strong><span>Text-based PDF, DOCX, and TXT are extracted automatically.</span></div>
           <button className="primary-action" type="button" onClick={extractCaseDetails} disabled={selectedFiles.length === 0 || isLoading}>
             {isLoading ? "Extracting..." : "Extract Case Details"}
           </button>

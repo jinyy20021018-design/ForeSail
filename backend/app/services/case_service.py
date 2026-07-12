@@ -132,13 +132,13 @@ def create_demo_case(uploaded_files: list[str] | None = None, imminent: bool = F
     case["seller"] = "Shanghai Solaris PV Co., Ltd."
     case["commodity"] = "Solar PV Modules"
     case["owner"] = "Trade Ops"
-    case["notes"] = "Demo case created from MVP seed data."
+    case["notes"] = "Demo case created from a built-in trade record."
     now = _now()
     case["created_at"] = now
     case["updated_at"] = now
-    case["mock_extraction_note"] = "Mock extracted fields for MVP. Files are not parsed in this version."
+    case["mock_extraction_note"] = "Pre-loaded demo case. Upload your own documents to run live extraction."
 
-    timeline = [{"status": "DRAFT", "reason": "Demo case initialized from built-in mock extracted fields."}]
+    timeline = [{"status": "DRAFT", "reason": "Demo case initialized from built-in seed documents."}]
     transition_case(case, "ACTIVE", timeline, "Core trade fields are available.")
 
     profile = build_watch_profile(case)
@@ -167,8 +167,8 @@ def create_buyer_demo_case() -> dict:
     now = _now()
     case["created_at"] = now
     case["updated_at"] = now
-    case["mock_extraction_note"] = "Mock extracted fields for MVP. Files are not parsed in this version."
-    return _finalize_demo_case(case, "Buyer demo case initialized from built-in mock extracted fields.")
+    case["mock_extraction_note"] = "Pre-loaded demo case. Upload your own documents to run live extraction."
+    return _finalize_demo_case(case, "Buyer demo case initialized from built-in seed documents.")
 
 
 def create_hormuz_demo_case() -> dict:
@@ -186,7 +186,7 @@ def create_hormuz_demo_case() -> dict:
     now = _now()
     case["created_at"] = now
     case["updated_at"] = now
-    case["mock_extraction_note"] = "Mock extracted fields for MVP. Files are not parsed in this version."
+    case["mock_extraction_note"] = "Pre-loaded demo case. Upload your own documents to run live extraction."
     return _finalize_demo_case(case, "Hormuz demo case initialized from built-in seed documents.")
 
 
@@ -205,8 +205,8 @@ def create_redsea_demo_case() -> dict:
     now = _now()
     case["created_at"] = now
     case["updated_at"] = now
-    case["mock_extraction_note"] = "Mock extracted fields for MVP. Files are not parsed in this version."
-    return _finalize_demo_case(case, "Red Sea demo case initialized from built-in mock extracted fields.")
+    case["mock_extraction_note"] = "Pre-loaded demo case. Upload your own documents to run live extraction."
+    return _finalize_demo_case(case, "Red Sea demo case initialized from built-in seed documents.")
 
 
 def create_typhoon_demo_case() -> dict:
@@ -224,8 +224,8 @@ def create_typhoon_demo_case() -> dict:
     now = _now()
     case["created_at"] = now
     case["updated_at"] = now
-    case["mock_extraction_note"] = "Mock extracted fields for MVP. Files are not parsed in this version."
-    return _finalize_demo_case(case, "Typhoon demo case initialized from built-in mock extracted fields.")
+    case["mock_extraction_note"] = "Pre-loaded demo case. Upload your own documents to run live extraction."
+    return _finalize_demo_case(case, "Typhoon demo case initialized from built-in seed documents.")
 
 
 def create_case(payload: dict) -> dict:

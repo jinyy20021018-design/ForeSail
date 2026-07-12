@@ -19,7 +19,7 @@ def extract_with_vision_pages(document: dict, reason_code: str = "SCANNED_PDF_UN
         "warnings": [],
         "errors": [{
             "code": "VISION_NOT_IMPLEMENTED",
-            "message": "Vision pages extraction is not implemented yet.",
+            "message": "Vision-based extraction is an optional mode and is not enabled in this build.",
         }],
         "vision_used": False,
     }

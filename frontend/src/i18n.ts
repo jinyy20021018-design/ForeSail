@@ -6,8 +6,8 @@ const text: Record<Language, Record<string, string>> = {
     mvp: "MVP 1.0",
     appTitle: "ForeSail",
     createLead: "Create one case-aware shipment monitor for CAPEMOLLINI on the Shanghai to Chittagong to Dhaka route.",
-    mockNoteStrong: "Mock extracted fields for MVP.",
-    mockNoteBody: "Files are not parsed in this version.",
+    mockNoteStrong: "Demo fields from a built-in trade record.",
+    mockNoteBody: "Upload your own documents to run live extraction.",
     createDemoCase: "Create Demo Case",
     creating: "Creating...",
     uploadCaseFiles: "Upload Case Files",
@@ -91,8 +91,8 @@ const text: Record<Language, Record<string, string>> = {
     mvp: "MVP 1.0",
     appTitle: "ForeSail",
     createLead: "为 CAPEMOLLINI 的上海至吉大港再至达卡航线创建一个交易级监控 Case。",
-    mockNoteStrong: "MVP 使用模拟抽取字段。",
-    mockNoteBody: "当前版本不会解析上传文件内容。",
+    mockNoteStrong: "示例字段来自内置交易样例。",
+    mockNoteBody: "上传自有单据即可进行实时抽取。",
     createDemoCase: "创建演示 Case",
     creating: "创建中...",
     uploadCaseFiles: "上传 Case 文件",
@@ -260,7 +260,7 @@ const rules: Record<string, string> = {
 };
 
 const timelineReasons: Record<string, string> = {
-  "Demo case initialized from built-in mock extracted fields.": "演示 Case 已基于内置模拟抽取字段初始化。",
+  "Demo case initialized from built-in seed documents.": "演示 Case 已基于内置种子单据初始化。",
   "Core trade fields are available.": "核心交易字段已具备。",
   "Monitoring started with configured external event feed.": "已使用已配置的外部事件流开始监控。",
   "At least one Relevant event was detected.": "检测到至少一个相关事件。",

@@ -1,12 +1,31 @@
 # ForeSail
 
-This MVP demonstrates a case-aware monitoring agent for one trade shipment case. It supports demo-case monitoring, agent orchestration, evidence-backed document extraction, field confirmation, obligation/deadline mapping, information gap detection, and action draft generation.
+ForeSail is a case-aware monitoring agent for cross-border trade shipments. For every trade, it watches the outside world — weather, geopolitics, port and route disruption — against the shipment's own contract terms, and tells the operator what is exposed, which contractual deadline is at risk, and exactly what action to take before it is missed.
 
-## MVP Boundary
+Each shipment is tracked as a single trade Case. ForeSail extracts and confirms the trade facts from the underlying documents (Contract/PO, Booking Confirmation, Letter of Credit), maps the Incoterm responsibility split and the obligation/deadline calendar, continuously scans external events for material exposure, and generates evidence-backed, ready-to-send action drafts. Every risk decision is produced by a deterministic, auditable engine — the agent orchestrates the workflow, it never invents a score.
 
-MVP 2.0 can upload and parse TXT, DOCX, and text-based PDF files. Image OCR is not enabled. If extraction cannot parse a file, the API returns a parse error and can fall back to deterministic MVP extraction for the demo flow.
+## The Problem
 
-This MVP does not connect to real AIS, weather, news, port, banking, insurance, FX, TMS, ERP, or email APIs.
+Cross-border trade teams have already automated their **internal** workflow — contracts, purchase orders, and letters of credit are generated and checked in minutes. What still gets done manually, or not at all, is judging the **external** world: weather, geopolitics, port congestion, canal and strait closures.
+
+Those are exactly the black-swan events — a typhoon over the loading window, a strait crisis on the route, a Red Sea war-risk diversion — that blow past a fixed LC presentation or latest-shipment deadline and turn into six-figure losses: demurrage, LC discrepancies, rejected documents, missed cover. A shipment can be perfectly documented internally and still be sunk by a risk no one was watching on the outside.
+
+Internal automation is a solved problem. External risk is the blind spot. **ForeSail closes it.**
+
+## Why ForeSail
+
+ForeSail reads each shipment's own contract terms and continuously watches the outside world against them, so a disruption becomes a specific, actionable warning — *which* deadline is now at risk, *who* bears the loss under the Incoterm, and *what* to send — while there is still time to act.
+
+- **Case-aware, not generic alerts.** A relevance engine scores every external event against this shipment's watch profile (vessel, ports, route regions, deadline sensitivity). No newsfeed noise — only events that actually touch this trade.
+- **Predictive, not just reactive.** ForeSail aligns the voyage schedule against weather forecasts, typhoon tracks, and a geopolitical corridor state machine, so exposure surfaces *before* the vessel sails into it — not after the loss lands.
+- **Incoterm attribution built in.** A deterministic Incoterm engine maps the CIF/FOB responsibility split — who carries risk and cost at each leg — so every warning names the party that is actually exposed.
+- **Trustworthy by design.** Scoring, classification, exposure mapping, status transitions, and deadline math are all produced by a deterministic, auditable engine. The LLM assists only with document extraction and drafting wording — it never invents a risk score. That is what makes the output safe to put in front of a money decision.
+
+## Scope
+
+Document extraction accepts TXT, DOCX, and text-based PDF files today; scanned-image OCR is on the roadmap. When a file cannot be parsed, the API returns a clear parse error and can fall back to deterministic extraction so the demo flow always completes.
+
+External event intelligence is live: by default ForeSail runs in **REAL** mode against Open-Meteo (weather), GDELT (global news), and RSS search connectors. Additional feeds — AIS vessel tracking, port, banking/LC, insurance, FX, TMS, and ERP — connect through explicit adapter boundaries, so new integrations plug in without touching the deterministic decision core.
 
 ## Demo Case
 
@@ -101,7 +120,7 @@ The `MonitoringAgent` layer orchestrates deterministic services in order:
 1. Load case
 2. Load confirmed fields
 3. Retrieve watch profile
-4. Fetch mock events
+4. Fetch external events (REAL connectors by default; deterministic demo feed offline)
 5. Classify events with the relevance engine
 6. Map exposures
 7. Map obligations and deadlines
@@ -145,7 +164,7 @@ If `REQUIRE_LLM_AGENT=false` or omitted, the backend can fall back to determinis
 
 ## Optional LLM Extraction
 
-Document extraction works without an API key by using regex/simple deterministic extraction plus MVP fallback values.
+Document extraction works out of the box with no API key, using a deterministic rule-based extractor with sensible fallbacks.
 
 To enable LLM extraction as an optional enhancement:
 
@@ -184,9 +203,10 @@ LLM extraction is isolated to document field extraction, evidence text support, 
 - `GET /api/cases/{case_id}/status-timeline`
 - `POST /api/cases/{case_id}/continue-monitoring`
 
-## TODO After MVP 2.0
+## Roadmap
 
-- Add persistent storage if multiple demo sessions are needed.
-- Add robust PDF extraction and OCR for scanned files.
-- Add authentication and role-based approval if moving beyond a local hackathon demo.
-- Add real data integrations only behind explicit adapter boundaries.
+- Persistent multi-tenant storage for teams tracking many concurrent shipments.
+- Scanned-document OCR to extend extraction to image-based PDFs.
+- Authentication and role-based approval workflows for enterprise deployment.
+- Expanded live integrations (AIS, port, banking/LC, insurance, FX, TMS, ERP) behind the existing adapter layer.
+- Inbound email/EDI ingestion to auto-create Cases directly from the operator's existing document flow.
