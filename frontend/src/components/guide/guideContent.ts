@@ -360,10 +360,15 @@ export const GUIDE_STEPS: Record<GuideTabKey, GuideStep[]> = {
 
 // ---- localStorage gating -------------------------------------------------
 
-const WELCOME_KEY = "foresail_guide_welcome";
-const SKIP_KEY = "foresail_guide_skipped";
-const INTAKE_KEY = "foresail_guide_intake";
-const tabKey = (tab: GuideTabKey) => `foresail_guide_tab_${tab}`;
+// Bump this to reset every visitor's "seen / skipped" state on the next
+// deploy — old keys stop being read, so the onboarding shows again for all.
+const GUIDE_VERSION = "v2";
+const NS = `foresail_guide_${GUIDE_VERSION}_`;
+
+const WELCOME_KEY = `${NS}welcome`;
+const SKIP_KEY = `${NS}skipped`;
+const INTAKE_KEY = `${NS}intake`;
+const tabKey = (tab: GuideTabKey) => `${NS}tab_${tab}`;
 
 export const guideStore = {
   welcomeSeen: () => localStorage.getItem(WELCOME_KEY) === "1",
