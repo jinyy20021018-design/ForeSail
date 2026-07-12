@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   api,
   type ActionDraft,
+  type ActionSet,
   type ApprovalPackage,
   type AgentRunRecord,
   type AgentRunResponse,
@@ -14,6 +15,7 @@ import {
   type FieldConflict,
   type InformationGap,
   type ObligationDeadline,
+  type PlanSet,
   type RecommendedAction,
   type RelevanceResult,
   type RiskSummary,
@@ -59,7 +61,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "agent", label: "Agent Runs" },
   { key: "events", label: "External Events" },
   { key: "risks", label: "Risks & Obligations" },
-  { key: "actions", label: "Actions & Drafts" },
+  { key: "actions", label: "Actions" },
   { key: "treatment", label: "Treatment Plans" },
   { key: "audit", label: "Audit" }
 ];
@@ -119,12 +121,8 @@ const agentProgressSteps = [
     detail: "Scoring events against this case with deterministic relevance rules."
   },
   {
-    title: "Map obligations, gaps, and actions",
-    detail: "Mapping exposures to deadlines, information gaps, and recommended actions."
-  },
-  {
-    title: "Generate treatment outputs",
-    detail: "Creating treatment plans, residual risk summaries, approval draft, and audit trace."
+    title: "Prepare action context",
+    detail: "Mapping exposures to obligations, information gaps, hazards, and Incoterm responsibilities."
   }
 ];
 
@@ -143,10 +141,12 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
   const [relevanceResults, setRelevanceResults] = useState<RelevanceResult[]>([]);
   const [riskSummary, setRiskSummary] = useState<RiskSummary | null>(null);
   const [actions, setActions] = useState<RecommendedAction[]>([]);
+  const [actionSets, setActionSets] = useState<ActionSet[]>([]);
   const [obligations, setObligations] = useState<ObligationDeadline[]>([]);
   const [gaps, setGaps] = useState<InformationGap[]>([]);
-  const [drafts, setDrafts] = useState<ActionDraft[]>([]);
   const [treatmentPlans, setTreatmentPlans] = useState<TreatmentPlan[]>([]);
+  const [planSets, setPlanSets] = useState<PlanSet[]>([]);
+  const [autoPlanActionSetId, setAutoPlanActionSetId] = useState<string | null>(null);
   const [approvalPackages, setApprovalPackages] = useState<ApprovalPackage[]>([]);
   const [cifResponsibility, setCifResponsibility] = useState<CifResponsibility | null>(null);
   const [hasConfirmedFacts, setHasConfirmedFacts] = useState(false);
@@ -196,8 +196,9 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       actionItems,
       obligationItems,
       gapItems,
-      draftItems,
+      actionSetItems,
       planItems,
+      planSetItems,
       approvalItems,
       confirmedFacts,
       perspectiveResult
@@ -216,8 +217,9 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       api.getActions(caseId).catch(() => []),
       api.getObligations(caseId).catch(() => []),
       api.getInformationGaps(caseId).catch(() => []),
-      api.getActionDrafts(caseId).catch(() => []),
+      api.listActionSets(caseId).catch(() => []),
       api.listTreatmentPlans(caseId).catch(() => []),
+      api.listPlanSets(caseId).catch(() => []),
       api.listApprovalPackages(caseId).catch(() => []),
       api.getConfirmedFacts(caseId).then(() => true).catch(() => false),
       api.getPerspectiveAnalysis(caseId, perspective).catch(() => null)
@@ -233,11 +235,12 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     setExternalEvents(storedEvents);
     setRelevanceResults(perspectiveResult?.relevance_results ?? relevance);
     setRiskSummary(perspectiveResult?.risk_summary ?? risk);
-    setActions(perspectiveResult?.actions ?? actionItems);
+    setActionSets(actionSetItems);
+    setActions(actionSetItems[actionSetItems.length - 1]?.actions ?? perspectiveResult?.actions ?? actionItems);
     setObligations(perspectiveResult?.obligations ?? obligationItems);
     setGaps(perspectiveResult?.information_gaps ?? gapItems);
-    setDrafts(draftItems);
     setTreatmentPlans(perspectiveResult?.treatment_plans ?? planItems);
+    setPlanSets(planSetItems);
     setApprovalPackages(approvalItems);
     setCifResponsibility(perspectiveResult?.cif_responsibility ?? null);
     const confirmStepComplete = workflowState?.steps.some(
@@ -256,7 +259,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           riskSummary: risk,
           obligations: obligationItems,
           gaps: gapItems,
-          drafts: draftItems,
+          drafts: [],
           actions: actionItems,
           statusTimeline,
           trace: latestTrace,
@@ -283,10 +286,12 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     setRelevanceResults([]);
     setRiskSummary(null);
     setActions([]);
+    setActionSets([]);
     setObligations([]);
     setGaps([]);
-    setDrafts([]);
     setTreatmentPlans([]);
+    setPlanSets([]);
+    setAutoPlanActionSetId(null);
     setApprovalPackages([]);
     setCifResponsibility(null);
     setHasConfirmedFacts(false);
@@ -354,19 +359,23 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       setTimeline(result.status_timeline);
       setRelevanceResults(analysis?.relevance_results ?? result.relevance_results);
       setRiskSummary(analysis?.risk_summary ?? result.risk_summary);
-      setActions(analysis?.actions ?? result.actions);
+      setActions([]);
       setObligations(analysis?.obligations ?? result.obligations);
       setGaps(analysis?.information_gaps ?? result.information_gaps);
-      setDrafts(result.action_drafts);
-      setTreatmentPlans(analysis?.treatment_plans ?? await api.listTreatmentPlans(caseId));
+      setTreatmentPlans(await api.listTreatmentPlans(caseId));
       setCifResponsibility(analysis?.cif_responsibility ?? null);
       setApprovalPackages(await api.listApprovalPackages(caseId));
       setExternalEvents(await api.getExternalEvents(caseId));
       setAgentRuns(await api.getAgentRuns(caseId));
       setWorkflow(await api.getWorkflowState(caseId));
-      setActiveTab("agent");
+      setActiveTab("actions");
       setAgentProgressStep(agentProgressSteps.length);
       setAgentRunComplete(true);
+      const generatedActionSet = await api.generateActionSet(caseId);
+      const nextActionSets = await api.listActionSets(caseId);
+      setActionSets(nextActionSets);
+      setActions(generatedActionSet.actions);
+      setWorkflow(await api.getWorkflowState(caseId));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Agent run failed.");
       await refreshCase();
@@ -386,6 +395,19 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Continue monitoring failed.");
     }
+  }
+
+  function handleActionSetsChange(sets: ActionSet[]) {
+    setActionSets(sets);
+    setActions(sets[sets.length - 1]?.actions ?? []);
+  }
+
+  async function handleActionsConfirmed(actionSet: ActionSet) {
+    const sets = await api.listActionSets(caseId);
+    handleActionSetsChange(sets);
+    setAutoPlanActionSetId(actionSet.action_set_id);
+    setActiveTab("treatment");
+    setWorkflow(await api.getWorkflowState(caseId));
   }
 
   async function changePerspective(nextPerspective: TradePerspective) {
@@ -429,7 +451,8 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
         ? "Case is already in monitoring mode."
         : null;
   const canRunAgent = agentRunBlockedReason === null;
-  const canContinue = tradeCase.status === "ACTION_REQUIRED";
+  const latestConfirmedActionSet = [...actionSets].reverse().find((item) => item.status === "CONFIRMED");
+  const canContinue = tradeCase.status === "ACTION_REQUIRED" && Boolean(latestConfirmedActionSet && planSets.some((item) => item.action_set_id === latestConfirmedActionSet.action_set_id && item.status === "COMPLETED"));
   const selectedPerspective = tradeCase.trade_perspective ?? "SELLER";
 
   const overviewSubtitle = [
@@ -618,10 +641,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
       )}
 
       {activeTab === "actions" && (
-        <>
-          <ActionBoard actions={actions} language={language} />
-          <OperationalPanels obligations={[]} gaps={[]} drafts={drafts} caseId={caseId} onDraftsChange={setDrafts} showObligations={false} showGaps={false} />
-        </>
+        <ActionBoard caseId={caseId} actionSets={actionSets} language={language} onActionSetsChange={handleActionSetsChange} onConfirmed={handleActionsConfirmed} onError={setError} />
       )}
 
       {activeTab === "treatment" && (
@@ -635,10 +655,14 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           obligations={obligations}
           gaps={gaps}
           actions={actions}
-          drafts={drafts}
+          actionSets={actionSets}
+          planSets={planSets}
+          autoGenerateActionSetId={autoPlanActionSetId}
           plans={treatmentPlans}
           approvalPackages={approvalPackages}
           onPlansChange={setTreatmentPlans}
+          onPlanSetsChange={setPlanSets}
+          onAutoGenerateHandled={() => setAutoPlanActionSetId(null)}
           onApprovalPackagesChange={setApprovalPackages}
           onError={setError}
         />
