@@ -37,9 +37,13 @@ class VoyageScheduleTest(unittest.TestCase):
     def test_position_on_and_transit_windows(self) -> None:
         schedule = build_voyage_schedule(self.case)
         etd = date.fromisoformat(self.case["etd"])
-        self.assertEqual(position_on(schedule, etd)["status"], "en_route")
-        # Before ETD the vessel is clamped to the loading port (pre_departure) so it is always plottable.
-        self.assertEqual(position_on(schedule, etd - timedelta(days=30))["status"], "pre_departure")
+        position = position_on(schedule, etd)
+        self.assertIsNotNone(position)
+        self.assertEqual(position["status"], "en_route")
+        pre_departure = position_on(schedule, etd - timedelta(days=30))
+        self.assertIsNotNone(pre_departure)
+        self.assertEqual(pre_departure["status"], "pre_departure")
+        self.assertEqual(pre_departure["date"], self.case["etd"])
         windows = region_transit_windows(schedule)
         self.assertTrue(windows)
         self.assertEqual(windows[0]["start"], self.case["etd"])

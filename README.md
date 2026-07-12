@@ -75,6 +75,54 @@ Open:
 http://127.0.0.1:5173
 ```
 
+## Free Deployment
+
+This setup supports a free demo deployment with the frontend on Vercel and the backend on Render. Configure secrets and environment variables in the hosting dashboards. Do not commit API keys or other secrets.
+
+Render backend:
+
+```text
+Root Directory: backend
+Build Command: pip install -r requirements.txt
+Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Health Check: /api/health
+```
+
+Recommended Render environment variables for a no-paid-API demo:
+
+```text
+USE_LLM_EXTRACTION=false
+USE_LLM_SUMMARY=false
+REQUIRE_LLM_AGENT=false
+USE_LLM_RELEVANCE_FACTORS=false
+EVENT_SOURCE_MODE=REAL
+OPEN_METEO_ENABLED=true
+REAL_SEARCH_ENABLED=true
+GDELT_ENABLED=true
+CORS_ORIGINS=https://YOUR-PROJECT.vercel.app
+```
+
+Vercel frontend:
+
+```text
+Root Directory: frontend
+Framework: Vite
+Build Command: npm run build
+Output Directory: dist
+VITE_API_BASE_URL=https://YOUR-RENDER-SERVICE.onrender.com
+```
+
+After Vercel assigns the real frontend URL, replace `YOUR-PROJECT.vercel.app` in Render's `CORS_ORIGINS` with that exact URL.
+
+Limitations:
+
+- Render's free backend can sleep after inactivity.
+- Its local filesystem is ephemeral.
+- The project currently stores SQLite data and uploaded documents locally, so they may disappear after a restart, redeployment, or sleep cycle.
+- This configuration is suitable for demos, not durable production storage.
+- A production version should use PostgreSQL and object storage.
+- Secrets must be configured in hosting dashboards and never committed.
+
 ## Tests
 
 From `backend/`:
