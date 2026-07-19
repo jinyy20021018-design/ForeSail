@@ -11,6 +11,10 @@ interface Props {
   // Label for the previous tab, shown as a "Back" on the first step so the
   // user can retreat through the guided flow. null => no cross-tab back.
   prevLabel?: string | null;
+  // While true (a monitoring run is in flight) the tour parks on its current
+  // step and refuses to move forward — otherwise it walks the user on to the
+  // next tabs before the run has produced anything to look at.
+  hold?: boolean;
   onClose: (dir: GuideExit) => void;
 }
 
@@ -18,7 +22,7 @@ const PAD = 8;
 const TOOLTIP_W = 340;
 const TOOLTIP_H = 180;
 
-export function GuideTour({ steps, nextLabel, prevLabel = null, onClose }: Props) {
+export function GuideTour({ steps, nextLabel, prevLabel = null, hold = false, onClose }: Props) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
@@ -72,11 +76,14 @@ export function GuideTour({ steps, nextLabel, prevLabel = null, onClose }: Props
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, isLast, nextLabel, prevLabel]);
+  }, [step, isLast, nextLabel, prevLabel, hold]);
 
   if (!current) return null;
 
   function advance() {
+    // Don't let the tour move on while a monitoring run is still in flight —
+    // the next tabs have nothing to show until it finishes.
+    if (hold) return;
     if (isLast) onClose(nextLabel ? "next" : "done");
     else setStep((s) => s + 1);
   }
@@ -136,7 +143,8 @@ export function GuideTour({ steps, nextLabel, prevLabel = null, onClose }: Props
         </button>
         <h3>{current.title}</h3>
         <p>{current.body}</p>
-        {current.advanceOnClick && <p className="guide-hint">↑ Click the highlighted button to continue.</p>}
+        {current.advanceOnClick && !hold && <p className="guide-hint">↑ Click the highlighted button to continue.</p>}
+        {hold && <p className="guide-hint">Waiting for the monitoring run to finish…</p>}
 
         <div className="guide-foot">
           <div className="guide-dots" aria-hidden="true">
@@ -150,11 +158,16 @@ export function GuideTour({ steps, nextLabel, prevLabel = null, onClose }: Props
                 {step > 0 ? "Back" : `← ${prevLabel}`}
               </button>
             )}
-            {!current.advanceOnClick && (
-              <button className="guide-next" type="button" onClick={advance}>
-                {finalLabel}
-              </button>
-            )}
+            {!current.advanceOnClick &&
+              (hold ? (
+                <button className="guide-next" type="button" disabled>
+                  Running…
+                </button>
+              ) : (
+                <button className="guide-next" type="button" onClick={advance}>
+                  {finalLabel}
+                </button>
+              ))}
           </div>
         </div>
       </div>

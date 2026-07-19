@@ -735,6 +735,7 @@ export function CaseWorkspace({ caseId, language, onCaseChange, onNavigate }: Pr
           steps={GUIDE_STEPS[guideTab]}
           nextLabel={nextTabOf(guideTab) ? TAB_LABELS[nextTabOf(guideTab) as GuideTabKey] : null}
           prevLabel={prevTabOf(guideTab) ? TAB_LABELS[prevTabOf(guideTab) as GuideTabKey] : null}
+          hold={isRunning}
           onClose={closeGuideTour}
         />
       )}
