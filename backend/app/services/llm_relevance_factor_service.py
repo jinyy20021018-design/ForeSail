@@ -4,6 +4,8 @@ from pathlib import Path
 import urllib.error
 import urllib.request
 
+from app.services import llm_provider
+
 
 ALLOWED_FACTORS = {
     "vessel_match",
@@ -44,11 +46,11 @@ def build_factor_metadata(case: dict, event: dict, deterministic_factors: list[s
     if not _truthy(os.getenv("USE_LLM_RELEVANCE_FACTORS")):
         return base
 
-    if not os.getenv("OPENAI_API_KEY"):
+    if not llm_provider.api_key():
         return {
             **base,
-            "llm_factor_summary": "LLM relevance factor extraction was enabled, but OPENAI_API_KEY is not configured; deterministic factors were used.",
-            "llm_factor_error": "OPENAI_API_KEY_NOT_CONFIGURED",
+            "llm_factor_summary": f"LLM relevance factor extraction was enabled, but no {llm_provider.provider_label()} API key is configured; deterministic factors were used.",
+            "llm_factor_error": "LLM_API_KEY_NOT_CONFIGURED",
         }
 
     try:
@@ -92,49 +94,41 @@ def summarize_factor_metadata(results: list[dict]) -> dict:
 
 
 def _extract_candidate_factors(case: dict, event: dict) -> dict:
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    payload = {
-        "model": os.getenv("OPENAI_RELEVANCE_FACTOR_MODEL", "gpt-4o-mini"),
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Extract candidate relevance match factors for a trade disruption monitoring system. "
-                    "Return only JSON. Do not assign final score, final classification, case status, risk level, or treatment actions."
-                ),
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {
-                        "allowed_factors": sorted(ALLOWED_FACTORS),
-                        "case_watch_profile": _case_payload(case),
-                        "external_event": _event_payload(event),
-                        "required_json_schema": {
-                            "candidate_factors": [
-                                {"factor": "watched_port_match", "evidence": "short evidence text", "confidence": 0.8}
-                            ],
-                            "missing_direct_evidence": ["No vessel name match"],
-                            "llm_summary": "short explanation of candidate factor reasoning",
-                        },
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Extract candidate relevance match factors for a trade disruption monitoring system. "
+                "Return only JSON. Do not assign final score, final classification, case status, risk level, or treatment actions."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "allowed_factors": sorted(ALLOWED_FACTORS),
+                    "case_watch_profile": _case_payload(case),
+                    "external_event": _event_payload(event),
+                    "required_json_schema": {
+                        "candidate_factors": [
+                            {"factor": "watched_port_match", "evidence": "short evidence text", "confidence": 0.8}
+                        ],
+                        "missing_direct_evidence": ["No vessel name match"],
+                        "llm_summary": "short explanation of candidate factor reasoning",
                     },
-                    ensure_ascii=True,
-                ),
-            },
-        ],
-        "temperature": 0,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        method="POST",
-    )
+                },
+                ensure_ascii=True,
+            ),
+        },
+    ]
     timeout_seconds = int(os.getenv("OPENAI_RELEVANCE_FACTOR_TIMEOUT_SECONDS", "20"))
-    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-        body = json.loads(response.read().decode("utf-8"))
-    content = body["choices"][0]["message"]["content"]
+    content = llm_provider.chat_completion(
+        messages=messages,
+        purpose="relevance",
+        temperature=0,
+        response_format={"type": "json_object"},
+        timeout=timeout_seconds,
+    )
     return json.loads(content)
 
 

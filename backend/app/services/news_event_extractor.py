@@ -4,12 +4,13 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+from app.services import llm_provider
 from app.services.route_region_service import CORRIDOR_ALIASES
 UTC = timezone.utc
 
 
 def extract_event_from_news_item(item: dict, watch_profile: dict) -> dict | None:
-    if os.getenv("USE_LLM_EVENT_EXTRACTION", "false").lower() == "true" and os.getenv("OPENAI_API_KEY"):
+    if os.getenv("USE_LLM_EVENT_EXTRACTION", "false").lower() == "true" and llm_provider.api_key():
         event = _try_llm_extract(item, watch_profile)
         if event:
             return event
@@ -121,25 +122,19 @@ def _try_llm_extract(item: dict, watch_profile: dict) -> dict | None:
         f"Watch profile: {json.dumps(watch_profile, ensure_ascii=True)}\n"
         f"Title: {rss_item.get('title')}\nSummary: {rss_item.get('summary')}"
     )
-    payload = {
-        "model": os.getenv("OPENAI_EVENT_EXTRACTION_MODEL", "gpt-4o-mini"),
-        "messages": [
-            {"role": "system", "content": "Return only JSON for a normalized event candidate."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}", "Content-Type": "application/json"},
-        method="POST",
-    )
+    messages = [
+        {"role": "system", "content": "Return only JSON for a normalized event candidate."},
+        {"role": "user", "content": prompt},
+    ]
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        parsed = json.loads(body["choices"][0]["message"]["content"])
+        content = llm_provider.chat_completion(
+            messages=messages,
+            purpose="event_extraction",
+            temperature=0,
+            response_format={"type": "json_object"},
+            timeout=20,
+        )
+        parsed = json.loads(content)
         if not parsed.get("title"):
             return None
         fallback = _keyword_extract(item, watch_profile)
@@ -149,7 +144,7 @@ def _try_llm_extract(item: dict, watch_profile: dict) -> dict | None:
         fallback["confidence"] = min(1.0, float(parsed.get("confidence", fallback["confidence"])))
         fallback["raw_payload"]["llm_used"] = True
         return fallback
-    except (KeyError, json.JSONDecodeError, ValueError, TimeoutError, urllib.error.URLError, urllib.error.HTTPError):
+    except Exception:
         return None
 
 

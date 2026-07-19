@@ -1,5 +1,6 @@
 import os
 
+from app.services import llm_provider
 from app.services.document_service import get_documents, get_extracted_fields, get_field_conflicts
 
 AUTOFILL_FIELDS = [
@@ -166,7 +167,7 @@ def _case_name(values: dict) -> str:
 
 
 def _fallback_used() -> bool:
-    return os.getenv("USE_LLM_EXTRACTION", "").lower() != "true" or not os.getenv("OPENAI_API_KEY")
+    return os.getenv("USE_LLM_EXTRACTION", "").lower() != "true" or not llm_provider.api_key()
 
 
 def _autofill_mode(diagnostics: list[dict]) -> str:

@@ -4,6 +4,8 @@ from pathlib import Path
 import urllib.error
 import urllib.request
 
+from app.services import llm_provider
+
 
 def generate_agent_summary_result(
     *,
@@ -30,7 +32,7 @@ def generate_agent_summary_result(
         action_drafts=action_drafts or [],
     )
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = llm_provider.api_key()
     llm_required = _truthy(os.getenv("REQUIRE_LLM_AGENT"))
     llm_requested = llm_required or _truthy(os.getenv("USE_LLM_SUMMARY")) or bool(api_key)
 
@@ -49,7 +51,7 @@ def generate_agent_summary_result(
                 "summary_source": "deterministic_fallback",
                 "llm_enabled": False,
                 "llm_required": True,
-                "summary_warning": "LLM required but OPENAI_API_KEY is not configured; used deterministic summary.",
+                "summary_warning": f"LLM required but no {llm_provider.provider_label()} API key is configured; used deterministic summary.",
             }
         return {
             "summary": deterministic_summary,
@@ -172,7 +174,6 @@ def _openai_summary(
     information_gaps: list[dict],
     action_drafts: list[dict],
 ) -> str:
-    model = os.getenv("OPENAI_SUMMARY_MODEL", "gpt-4.1-mini")
     user_content = json.dumps(
         {
             "case_id": case["case_id"],
@@ -200,35 +201,23 @@ def _openai_summary(
         },
         ensure_ascii=True,
     )
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Write a concise user-facing agent run summary. Do not make new scoring, "
-                    "classification, exposure, status, date, or action decisions. Use only the supplied facts."
-                ),
-            },
-            {"role": "user", "content": user_content},
-        ],
-        "temperature": 0.2,
-    }
-
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Write a concise user-facing agent run summary. Do not make new scoring, "
+                "classification, exposure, status, date, or action decisions. Use only the supplied facts."
+            ),
         },
-        method="POST",
-    )
+        {"role": "user", "content": user_content},
+    ]
     timeout_seconds = int(os.getenv("OPENAI_SUMMARY_TIMEOUT_SECONDS", "60"))
-    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-        data = json.loads(response.read().decode("utf-8"))
-
-    content = data["choices"][0]["message"]["content"]
+    content = llm_provider.chat_completion(
+        messages=messages,
+        purpose="summary",
+        temperature=0.2,
+        timeout=timeout_seconds,
+    )
     if isinstance(content, str) and content.strip():
         return content.strip()
 

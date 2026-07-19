@@ -16,6 +16,7 @@ from typing import BinaryIO
 from app.services.case_service import get_case, replace_case_facts
 from app.services.document_extraction_pipeline import base_diagnostic, document_extraction_mode, finalize_diagnostic
 from app.services.extraction_schema_validator import validate_extracted_fields
+from app.services import llm_provider
 from app.services.openai_file_extraction_service import extract_with_openai_file
 from app.services.pdf_detection_service import detect_pdf, extract_pdf_text
 from app.services.persistence_service import load_item, save_item, clear_namespace
@@ -692,7 +693,7 @@ def _try_llm_extraction(case_id: str, document: dict, raw_text: str, diagnostic:
         return None
     if os.getenv("DOCUMENT_EXTRACTION_MODE", "AUTO").upper() == "FALLBACK_ONLY":
         return None
-    if os.getenv("USE_LLM_EXTRACTION", "").lower() != "true" or not os.getenv("OPENAI_API_KEY"):
+    if os.getenv("USE_LLM_EXTRACTION", "").lower() != "true" or not llm_provider.api_key():
         return None
     fields = _llm_extract_fields(document, raw_text)
     if fields is None:
@@ -759,32 +760,22 @@ def _llm_extract_fields(document: dict, raw_text: str) -> list[dict] | None:
         f"Filename: {document.get('filename')}\n"
         f"Text:\n{raw_text[:12000]}"
     )
-    payload = {
-        "model": os.getenv("OPENAI_EXTRACTION_MODEL", "gpt-4o-mini"),
-        "messages": [
-            {"role": "system", "content": "You extract structured trade facts with short evidence snippets."},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0,
-        "response_format": {"type": "json_object"},
-    }
-    request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+    messages = [
+        {"role": "system", "content": "You extract structured trade facts with short evidence snippets."},
+        {"role": "user", "content": prompt},
+    ]
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        content = body["choices"][0]["message"]["content"]
+        content = llm_provider.chat_completion(
+            messages=messages,
+            purpose="extraction",
+            temperature=0,
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
         parsed = json.loads(content)
         fields = parsed.get("fields")
         return fields if isinstance(fields, list) else None
-    except (KeyError, json.JSONDecodeError, TimeoutError, urllib.error.URLError, urllib.error.HTTPError, ValueError):
+    except Exception:
         return None
 
 

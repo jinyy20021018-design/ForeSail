@@ -180,6 +180,12 @@ The `MonitoringAgent` layer orchestrates deterministic services in order:
 
 Core business decisions remain deterministic. The agent layer does not perform event scoring, classification, exposure mapping, status transition, action deduplication, or date/money calculation.
 
+## LLM Provider
+
+ForeSail's optional LLM features — document field extraction, agent run summary, and relevance-factor / news-event extraction — run against a single configurable provider. **Google Gemini is the default provider** whenever a Gemini key is configured (`GEMINI_API_KEY`) or `LLM_PROVIDER=gemini` is set. Gemini is reached through its OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`), so the request shape is identical across providers and the deterministic decision core is untouched. Set `LLM_PROVIDER=openai` with `OPENAI_API_KEY` to fall back to OpenAI. Provider resolution lives in `backend/app/services/llm_provider.py`.
+
+The LLM only extracts document fields and writes summary/draft wording — it never produces a risk score, classification, exposure mapping, status transition, deadline calculation, or action decision. Those remain deterministic and auditable.
+
 ## Optional LLM Summary
 
 By default, external events are fetched in **REAL** mode from Open-Meteo, RSS search, and GDELT connectors (all enabled by default). Agent summaries are generated deterministically and do not require an API key unless you opt in.
@@ -200,8 +206,9 @@ REAL_SEARCH_ENABLED=true
 GDELT_ENABLED=true
 USE_LLM_SUMMARY=false
 REQUIRE_LLM_AGENT=false
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_SUMMARY_MODEL=gpt-4.1-mini
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 Restart the backend after changing `.env`.
@@ -218,7 +225,8 @@ To enable LLM extraction as an optional enhancement:
 
 ```text
 USE_LLM_EXTRACTION=true
-OPENAI_API_KEY=your_openai_api_key
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 LLM extraction is isolated to document field extraction, evidence text support, information gap wording, and draft wording. It is not used for event scoring, classification, status transition, deadline calculation final decisions, or action deduplication.
