@@ -4,6 +4,15 @@ from app.services.news_event_extractor import extract_event_from_news_item
 from app.services.rss_search_service import fetch_rss_items, filter_rss_items
 from app.services.search_query_builder import build_external_event_queries
 
+# Real, free maritime/trade news RSS feeds used when REAL_SEARCH_FEED_URLS is not
+# set. These carry live, real-source headlines (geopolitics, sanctions, strait
+# closures, weather) with clickable URLs, so events surfaced here are genuine.
+_DEFAULT_FEED_URLS = ",".join([
+    "https://gcaptain.com/feed/",
+    "https://www.maritime-executive.com/articles.rss",
+    "https://splash247.com/feed/",
+])
+
 
 class RealSearchEventConnector:
     name = "real_search_event_connector"
@@ -64,7 +73,7 @@ def _summary(queries: list[dict], warnings: list[str], enabled: bool) -> dict:
 
 
 def _feed_urls() -> list[str]:
-    return [url.strip() for url in os.getenv("REAL_SEARCH_FEED_URLS", "").split(",") if url.strip()]
+    return [url.strip() for url in os.getenv("REAL_SEARCH_FEED_URLS", _DEFAULT_FEED_URLS).split(",") if url.strip()]
 
 
 def _int_env(name: str, default: int) -> int:

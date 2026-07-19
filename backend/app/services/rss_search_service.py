@@ -73,7 +73,7 @@ def _parse_feed(content: bytes, source_feed: str) -> list[dict]:
     candidates = root.findall(".//item") or root.findall(".//{http://www.w3.org/2005/Atom}entry")
     items: list[dict] = []
     for element in candidates:
-        title = _text(element, "title")
+        title = _text(element, "title") or _text(element, "{http://www.w3.org/2005/Atom}title")
         summary = _text(element, "description") or _text(element, "summary") or _text(element, "{http://www.w3.org/2005/Atom}summary")
         link = _text(element, "link") or _atom_link(element)
         published_raw = _text(element, "pubDate") or _text(element, "published") or _text(element, "{http://www.w3.org/2005/Atom}published")
