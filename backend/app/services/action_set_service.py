@@ -195,17 +195,19 @@ def _context(case_id: str) -> dict:
 
 
 def _validate_raw_action(raw: dict, hazards: set, obligations: set, exposures: set) -> None:
+    # Sanitize (don't reject) LLM output: a single hallucinated reference must
+    # not throw away the whole action set. Drop unknown hazard/obligation links,
+    # blank an unknown exposure, default an invalid responsible party — while
+    # keeping the hard shape checks (title/owner/priority/date) below.
     if not isinstance(raw, dict):
         raise ActionSetError("INVALID_LLM_OUTPUT", "Each action must be an object.")
     _validate_editable_action(raw)
     if raw.get("responsible_party") not in VALID_RESPONSIBLE:
-        raise ActionSetError("INVALID_LLM_OUTPUT", "Action has an invalid responsible party.")
-    if any(item not in hazards for item in raw.get("linked_hazard_ids", [])):
-        raise ActionSetError("INVALID_LLM_OUTPUT", "Action references an unknown hazard.")
-    if any(item not in obligations for item in raw.get("linked_obligation_ids", [])):
-        raise ActionSetError("INVALID_LLM_OUTPUT", "Action references an unknown obligation.")
+        raw["responsible_party"] = "SELLER"
+    raw["linked_hazard_ids"] = [item for item in raw.get("linked_hazard_ids", []) if item in hazards]
+    raw["linked_obligation_ids"] = [item for item in raw.get("linked_obligation_ids", []) if item in obligations]
     if exposures and raw.get("related_exposure") not in exposures:
-        raise ActionSetError("INVALID_LLM_OUTPUT", "Action references an unknown exposure.")
+        raw["related_exposure"] = None
 
 
 def _validate_editable_action(action: dict) -> None:
