@@ -64,7 +64,6 @@ class ExternalEventIngestionTest(unittest.TestCase):
                 "typhoon_track_connector",
                 "risk_calendar_connector",
                 "policy_registry_connector",
-                "llm_discovery_connector",
             ],
         )
         self.assertEqual(result["events_deduped_count"], 5)
@@ -84,7 +83,6 @@ class ExternalEventIngestionTest(unittest.TestCase):
                 "typhoon_track_connector",
                 "risk_calendar_connector",
                 "policy_registry_connector",
-                "llm_discovery_connector",
             ],
         )
         self.assertGreater(result["events_deduped_count"], 0)
