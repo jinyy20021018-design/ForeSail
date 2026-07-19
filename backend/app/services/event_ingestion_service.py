@@ -2,6 +2,7 @@ import os
 
 from app.services.event_connectors.curated_event_connector import CuratedEventConnector
 from app.services.event_connectors.gdelt_event_connector import GdeltEventConnector
+from app.services.event_connectors.llm_discovery_connector import LlmDiscoveryConnector
 from app.services.event_connectors.mock_event_connector import MockEventConnector
 from app.services.event_connectors.open_meteo_weather_connector import OpenMeteoWeatherConnector
 from app.services.event_connectors.policy_registry_connector import PolicyRegistryConnector
@@ -98,6 +99,7 @@ def _connectors_for_mode(mode: str):
         TyphoonTrackConnector(),
         RiskCalendarConnector(),
         PolicyRegistryConnector(),
+        LlmDiscoveryConnector(),
     ]
     if mode == "REAL":
         return real_connectors
