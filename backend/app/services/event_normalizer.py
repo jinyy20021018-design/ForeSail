@@ -74,7 +74,8 @@ def normalize_event(event: dict, case_id: str, index: int = 1, source_hint: str 
         "affected_vessels": affected_vessels,
         "severity": severity,
         "confidence": confidence,
-        "url": event.get("url"),
+        "url": event.get("url") or _first_source_url(event),
+        "sources": event.get("sources") if isinstance(event.get("sources"), list) else [],
         "raw_payload": event.get("raw_payload") if event.get("raw_payload") is not None else event,
         "dedup_key": dedup_key,
         "created_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -112,6 +113,15 @@ def _source_type(event: dict) -> str:
 def _event_type(value: str) -> str:
     mapped = LEGACY_EVENT_TYPE_MAP.get(value, value)
     return mapped if mapped in VALID_EVENT_TYPES else "UNKNOWN"
+
+
+def _first_source_url(event: dict) -> str | None:
+    # Curated/real events carry their real source links under `sources`; surface
+    # the first one as the event URL so the UI can render a clickable source.
+    sources = event.get("sources")
+    if isinstance(sources, list) and sources and isinstance(sources[0], str):
+        return sources[0]
+    return None
 
 
 def _severity(value) -> str:
