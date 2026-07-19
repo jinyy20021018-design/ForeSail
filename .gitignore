@@ -16,3 +16,14 @@ backend/server*.log
 frontend/server*.log
 *.env.bak
 backend/app/uploads/
+
+# Local Codex / test artifacts
+.codex/
+.pytest_cache/
+backend/.pytest_cache/
+
+# Local dev server and screenshot logs
+backend/*.dev.log
+frontend/*.dev.log
+backend/screenshot-*.log
+frontend/screenshot-*.log
