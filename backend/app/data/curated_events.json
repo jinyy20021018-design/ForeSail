@@ -53,7 +53,7 @@
   {
     "event_id": "EVT-203",
     "title": "War-risk surcharge and Hormuz transit toll raise Gulf shipping cost",
-    "type": "SECURITY",
+    "type": "TRADE_POLICY",
     "event_time": "2026-07-09",
     "event_time_offset_days": -3,
     "affected_vessel": null,
@@ -76,7 +76,7 @@
   {
     "event_id": "EVT-301",
     "title": "Houthi drone and missile attacks force Red Sea convoy diversion around Cape of Good Hope",
-    "type": "SECURITY",
+    "type": "GEOPOLITICAL",
     "event_time": "2026-01-01",
     "event_time_offset_days": -2,
     "affected_vessel": null,

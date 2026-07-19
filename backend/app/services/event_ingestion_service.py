@@ -90,7 +90,9 @@ def list_external_events_for_run(case_id: str, agent_run_id: str) -> list[dict]:
 
 def _connectors_for_mode(mode: str):
     if mode == "MOCK":
-        return [MockEventConnector(), CuratedEventConnector()]
+        # Seed/offline mode uses only real, sourced curated events (no synthetic
+        # placeholder events), so pre-loaded cases open with genuine signals.
+        return [CuratedEventConnector()]
     real_connectors = [
         CuratedEventConnector(),
         GdeltEventConnector(),

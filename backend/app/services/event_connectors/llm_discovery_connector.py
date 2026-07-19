@@ -120,7 +120,7 @@ class LlmDiscoveryConnector:
             etype = _event_type(item.get("event_type"))
             events.append({
                 "event_id": f"EVT-LLM-{index:03d}",
-                "title": str(item.get("title")),
+                "title": "AI-inferred · " + str(item.get("title")),
                 "type": etype,
                 "source_type": _SOURCE_TYPE_BY_EVENT.get(etype, "NEWS"),
                 "event_time_offset_days": offset,
@@ -129,8 +129,8 @@ class LlmDiscoveryConnector:
                 "affected_vessel": facts.get("vessel"),
                 "severity": str(item.get("severity") or "MEDIUM"),
                 "confidence": _confidence(item.get("confidence")),
-                "source": "llm_discovery",
-                "impact": str(item.get("description") or item.get("title")),
+                "source": "ai_analyst_inference",
+                "impact": "[AI-inferred signal — model-projected from this shipment's route, cargo and timing; not a verified news report] " + str(item.get("description") or item.get("title")),
                 "discovery_category": item.get("category"),
                 "discovery_timing": timing,
                 "llm_inferred": True,

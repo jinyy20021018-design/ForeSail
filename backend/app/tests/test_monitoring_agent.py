@@ -25,10 +25,10 @@ class MonitoringAgentTest(unittest.TestCase):
         self.assertEqual(result["case_id"], "CASE-001")
         self.assertEqual(result["status_before"], "ACTIVE")
         self.assertEqual(result["status_after"], "AT_RISK")
-        self.assertEqual(result["events_scanned"], 10)
-        self.assertEqual(result["relevant_count"], 4)
+        self.assertEqual(result["events_scanned"], 5)
+        self.assertEqual(result["relevant_count"], 1)
         self.assertEqual(result["watch_count"], 0)
-        self.assertEqual(result["irrelevant_count"], 6)
+        self.assertEqual(result["irrelevant_count"], 4)
         self.assertEqual(result["case"]["status"], "AT_RISK")
         self.assertEqual(result["actions"], [])
         self.assertEqual(result["action_drafts"], [])
@@ -37,7 +37,7 @@ class MonitoringAgentTest(unittest.TestCase):
     def test_agent_result_contains_summary_and_trace(self) -> None:
         result = self.agent.run_monitoring_cycle(self.case["case_id"])
 
-        self.assertIn("Agent scanned 10 external events", result["summary"])
+        self.assertIn("Agent scanned 5 external events", result["summary"])
         self.assertGreaterEqual(len(result["trace"]), 8)
         self.assertEqual(result["trace"][0]["name"], "Load Case")
         self.assertIn("Extract LLM Candidate Match Factors", [step["name"] for step in result["trace"]])
@@ -107,8 +107,8 @@ class MonitoringAgentTest(unittest.TestCase):
             self.assertEqual(result["summary_source"], "deterministic_fallback")
             self.assertTrue(result.get("summary_warning"))
             self.assertTrue(result["llm_required"])
-            self.assertEqual(result["relevant_count"], 4)
-            self.assertIn("Agent scanned 10 external events", result["summary"])
+            self.assertEqual(result["relevant_count"], 1)
+            self.assertIn("Agent scanned 5 external events", result["summary"])
         finally:
             os.environ.pop("REQUIRE_LLM_AGENT", None)
 

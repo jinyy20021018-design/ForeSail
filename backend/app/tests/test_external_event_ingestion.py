@@ -43,11 +43,11 @@ class ExternalEventIngestionTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return case_id
 
-    def test_mock_mode_only_calls_mock_connector(self) -> None:
+    def test_mock_mode_uses_curated_only(self) -> None:
         case_id = self.create_confirmed_case()
         result = fetch_events_for_case(case_id, get_watch_profile(case_id))
         self.assertEqual(result["mode"], "MOCK")
-        self.assertEqual(result["connectors_called"], ["mock_event_connector", "curated_event_connector"])
+        self.assertEqual(result["connectors_called"], ["curated_event_connector"])
         self.assertGreater(result["events_deduped_count"], 0)
 
     def test_real_mode_does_not_call_mock_connector(self) -> None:
