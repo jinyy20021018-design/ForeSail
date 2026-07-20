@@ -2,6 +2,7 @@ import copy
 import os
 from datetime import date, datetime, timezone
 
+from app.services import llm_provider
 from app.services.case_service import get_case, get_relevance_results, get_risk_summary, mark_actions_required
 from app.services.document_service import get_confirmed_facts, get_information_gaps, get_obligations
 from app.services.hazard_service import list_hazards
@@ -54,11 +55,11 @@ ACTION_SCHEMA = {
 
 def generate_action_set(case_id: str) -> dict:
     context = _context(case_id)
-    model = os.getenv("OPENAI_ACTION_MODEL", "gpt-4o-mini")
+    model = llm_provider.model_for("action")
     try:
         output = generate_structured(
-            model=model,
-            timeout_seconds=int(os.getenv("OPENAI_ACTION_TIMEOUT_SECONDS", "60")),
+            purpose="action",
+            timeout_seconds=int(os.getenv("GEMINI_ACTION_TIMEOUT_SECONDS", "60")),
             schema_name="foresail_action_candidates",
             schema=ACTION_SCHEMA,
             instructions=(

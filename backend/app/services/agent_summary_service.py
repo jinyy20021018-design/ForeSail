@@ -61,7 +61,7 @@ def generate_agent_summary_result(
         }
 
     try:
-        summary = _openai_summary(
+        summary = _llm_summary(
             api_key=api_key,
             fallback=deterministic_summary,
             case=case,
@@ -89,7 +89,7 @@ def generate_agent_summary_result(
                 "llm_required": True,
                 "summary_warning": (
                     "LLM Agent summary failed while REQUIRE_LLM_AGENT=true "
-                    f"({_format_openai_error(error)}); used deterministic summary."
+                    f"({_format_llm_error(error)}); used deterministic summary."
                 ),
             }
         return {
@@ -160,7 +160,7 @@ def _deterministic_summary(
     )
 
 
-def _openai_summary(
+def _llm_summary(
     *,
     api_key: str,
     fallback: str,
@@ -211,7 +211,7 @@ def _openai_summary(
         },
         {"role": "user", "content": user_content},
     ]
-    timeout_seconds = int(os.getenv("OPENAI_SUMMARY_TIMEOUT_SECONDS", "60"))
+    timeout_seconds = int(os.getenv("GEMINI_SUMMARY_TIMEOUT_SECONDS", os.getenv("OPENAI_SUMMARY_TIMEOUT_SECONDS", "60")))
     content = llm_provider.chat_completion(
         messages=messages,
         purpose="summary",
@@ -228,7 +228,7 @@ def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _format_openai_error(error: Exception) -> str:
+def _format_llm_error(error: Exception) -> str:
     if isinstance(error, urllib.error.HTTPError):
         try:
             body = error.read().decode("utf-8")
@@ -248,8 +248,8 @@ def _load_local_env() -> None:
         return
 
     refresh_keys = {
-        "OPENAI_SUMMARY_MODEL",
-        "OPENAI_SUMMARY_TIMEOUT_SECONDS",
+        "GEMINI_SUMMARY_MODEL",
+        "GEMINI_SUMMARY_TIMEOUT_SECONDS",
     }
     for line in env_path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()

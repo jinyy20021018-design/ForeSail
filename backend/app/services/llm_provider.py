@@ -4,16 +4,13 @@ ForeSail's optional LLM features (document field extraction, agent run
 summary, relevance-factor and news-event extraction) all run against a single
 configurable provider through the same chat/completions request shape.
 
-Google Gemini is the default provider whenever a Gemini/Google API key is
-present, or when ``LLM_PROVIDER=gemini``; otherwise the legacy OpenAI
-configuration is used. Gemini is reached through its OpenAI-compatible
-endpoint, so every call site keeps an identical request body and only the base
-URL, key, and model name change.
+Google Gemini is the default provider. Gemini is reached through its
+OpenAI-compatible endpoint, so every call site keeps an identical request body
+and only the base URL, key, and model name change.
 
-``chat_completion`` sends the primary provider first and, when a fallback key
-is configured (default on), automatically retries on the other provider if the
-primary request fails (e.g. a Gemini quota/429). Call sites keep their own
-parsing and deterministic fallbacks.
+``chat_completion`` sends the primary provider first. OpenAI fallback is
+available only when explicitly enabled. Call sites keep their own parsing and
+deterministic fallbacks.
 """
 
 import json
@@ -29,18 +26,24 @@ _OPENAI_MODEL_DEFAULTS = {
     "extraction": "gpt-4o-mini",
     "relevance": "gpt-4o-mini",
     "event_extraction": "gpt-4o-mini",
+    "action": "gpt-4o-mini",
+    "plan": "gpt-4o-mini",
 }
 _OPENAI_MODEL_ENV = {
     "summary": "OPENAI_SUMMARY_MODEL",
     "extraction": "OPENAI_EXTRACTION_MODEL",
     "relevance": "OPENAI_RELEVANCE_FACTOR_MODEL",
     "event_extraction": "OPENAI_EVENT_EXTRACTION_MODEL",
+    "action": "OPENAI_ACTION_MODEL",
+    "plan": "OPENAI_PLAN_MODEL",
 }
 _GEMINI_MODEL_ENV = {
     "summary": "GEMINI_SUMMARY_MODEL",
     "extraction": "GEMINI_EXTRACTION_MODEL",
     "relevance": "GEMINI_RELEVANCE_FACTOR_MODEL",
     "event_extraction": "GEMINI_EVENT_EXTRACTION_MODEL",
+    "action": "GEMINI_ACTION_MODEL",
+    "plan": "GEMINI_PLAN_MODEL",
 }
 
 
@@ -66,7 +69,7 @@ def provider() -> str:
         return "gemini"
     if explicit == "openai":
         return "openai"
-    return "gemini" if _gemini_key() else "openai"
+    return "gemini"
 
 
 def _key_for(prov: str) -> str:
@@ -105,7 +108,7 @@ def provider_label() -> str:
 def _provider_chain() -> list[str]:
     primary = provider()
     chain = [primary]
-    if not _truthy(os.getenv("LLM_FALLBACK_ENABLED", "true")):
+    if not _truthy(os.getenv("LLM_FALLBACK_ENABLED", "false")):
         return chain
     fallback = "openai" if primary == "gemini" else "gemini"
     if _key_for(fallback):

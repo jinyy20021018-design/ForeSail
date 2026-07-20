@@ -2,6 +2,7 @@ import copy
 import os
 from datetime import datetime, timezone
 
+from app.services import llm_provider
 from app.services.action_set_service import confirmed_actions, get_action_set, latest_action_set
 from app.services.case_service import get_case, get_relevance_results, get_risk_summary
 from app.services.document_service import get_confirmed_facts, get_information_gaps, get_obligations
@@ -102,11 +103,11 @@ def generate_treatment_plans(case_id: str, action_set_id: str | None = None) -> 
         return _plan_set_response(existing)
 
     context = _plan_context(case_id, action_set, selected_actions)
-    model = os.getenv("OPENAI_PLAN_MODEL", "gpt-4o-mini")
+    model = llm_provider.model_for("plan")
     try:
         output = generate_structured(
-            model=model,
-            timeout_seconds=int(os.getenv("OPENAI_PLAN_TIMEOUT_SECONDS", "60")),
+            purpose="plan",
+            timeout_seconds=int(os.getenv("GEMINI_PLAN_TIMEOUT_SECONDS", "60")),
             schema_name="foresail_treatment_plans",
             schema=PLAN_SCHEMA,
             instructions=(

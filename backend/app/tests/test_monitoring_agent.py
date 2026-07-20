@@ -75,6 +75,9 @@ class MonitoringAgentTest(unittest.TestCase):
 
     def test_summary_fallback_without_llm_api_key(self) -> None:
         os.environ["USE_LLM_SUMMARY"] = "true"
+        os.environ["LLM_PROVIDER"] = "gemini"
+        os.environ["GEMINI_API_KEY"] = ""
+        os.environ["GOOGLE_API_KEY"] = ""
         os.environ.pop("OPENAI_API_KEY", None)
         try:
             summary = generate_agent_summary(
@@ -101,6 +104,9 @@ class MonitoringAgentTest(unittest.TestCase):
 
     def test_required_llm_without_api_key_completes_with_fallback(self) -> None:
         os.environ["REQUIRE_LLM_AGENT"] = "true"
+        os.environ["LLM_PROVIDER"] = "gemini"
+        os.environ["GEMINI_API_KEY"] = ""
+        os.environ["GOOGLE_API_KEY"] = ""
         os.environ["OPENAI_API_KEY"] = ""
         try:
             result = self.agent.run_monitoring_cycle(self.case["case_id"])
@@ -115,12 +121,15 @@ class MonitoringAgentTest(unittest.TestCase):
     def test_required_llm_api_failure_completes_with_fallback(self) -> None:
         os.environ["REQUIRE_LLM_AGENT"] = "true"
         os.environ["USE_LLM_SUMMARY"] = "true"
-        os.environ["OPENAI_API_KEY"] = "test-key"
+        os.environ["LLM_PROVIDER"] = "gemini"
+        os.environ["GEMINI_API_KEY"] = "test-key"
+        os.environ["GOOGLE_API_KEY"] = ""
+        os.environ["OPENAI_API_KEY"] = ""
         try:
             with patch(
-                "app.services.agent_summary_service._openai_summary",
+                "app.services.agent_summary_service._llm_summary",
                 side_effect=urllib.error.HTTPError(
-                    url="https://api.openai.com/v1/chat/completions",
+                    url="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                     code=404,
                     msg="Not Found",
                     hdrs=None,
@@ -134,6 +143,8 @@ class MonitoringAgentTest(unittest.TestCase):
         finally:
             os.environ.pop("REQUIRE_LLM_AGENT", None)
             os.environ.pop("USE_LLM_SUMMARY", None)
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
             os.environ.pop("OPENAI_API_KEY", None)
 
     def test_continue_monitoring_is_blocked_until_actions_and_plans_are_confirmed(self) -> None:

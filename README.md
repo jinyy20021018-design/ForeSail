@@ -182,7 +182,7 @@ Core business decisions remain deterministic. The agent layer does not perform e
 
 ## LLM Provider
 
-ForeSail's optional LLM features — document field extraction, agent run summary, and relevance-factor / news-event extraction — run against a single configurable provider. **Google Gemini is the default provider** whenever a Gemini key is configured (`GEMINI_API_KEY`) or `LLM_PROVIDER=gemini` is set. Gemini is reached through its OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`), so the request shape is identical across providers and the deterministic decision core is untouched. Set `LLM_PROVIDER=openai` with `OPENAI_API_KEY` to fall back to OpenAI. Provider resolution lives in `backend/app/services/llm_provider.py`.
+ForeSail's LLM features — document field extraction, agent run summary, relevance-factor / news-event extraction, action drafting, and treatment-plan drafting — run against a single configurable provider. **Google Gemini is the default provider** (`LLM_PROVIDER=gemini`) and accepts either `GEMINI_API_KEY` or `GOOGLE_API_KEY`. Gemini is reached through its OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai`), so the request shape is identical across providers and the deterministic decision core is untouched. Provider resolution lives in `backend/app/services/llm_provider.py`.
 
 The LLM only extracts document fields and writes summary/draft wording — it never produces a risk score, classification, exposure mapping, status transition, deadline calculation, or action decision. Those remain deterministic and auditable.
 
@@ -207,8 +207,11 @@ GDELT_ENABLED=true
 USE_LLM_SUMMARY=false
 REQUIRE_LLM_AGENT=false
 LLM_PROVIDER=gemini
+LLM_FALLBACK_ENABLED=false
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_ACTION_MODEL=gemini-3.1-flash-lite
+GEMINI_PLAN_MODEL=gemini-3.1-flash-lite
 ```
 
 Restart the backend after changing `.env`.

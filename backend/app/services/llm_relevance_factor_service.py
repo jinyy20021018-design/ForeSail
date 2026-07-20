@@ -121,7 +121,7 @@ def _extract_candidate_factors(case: dict, event: dict) -> dict:
             ),
         },
     ]
-    timeout_seconds = int(os.getenv("OPENAI_RELEVANCE_FACTOR_TIMEOUT_SECONDS", "20"))
+    timeout_seconds = int(os.getenv("GEMINI_RELEVANCE_FACTOR_TIMEOUT_SECONDS", os.getenv("OPENAI_RELEVANCE_FACTOR_TIMEOUT_SECONDS", "20")))
     content = llm_provider.chat_completion(
         messages=messages,
         purpose="relevance",

@@ -7,6 +7,9 @@ from app.services.llm_relevance_factor_service import build_factor_metadata
 
 class LlmRelevanceFactorTest(unittest.TestCase):
     def setUp(self) -> None:
+        os.environ["LLM_PROVIDER"] = "gemini"
+        os.environ["GEMINI_API_KEY"] = ""
+        os.environ["GOOGLE_API_KEY"] = ""
         os.environ["OPENAI_API_KEY"] = ""
         os.environ["USE_LLM_RELEVANCE_FACTORS"] = "false"
         self.case = {
@@ -33,6 +36,8 @@ class LlmRelevanceFactorTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         os.environ.pop("USE_LLM_RELEVANCE_FACTORS", None)
+        os.environ.pop("GEMINI_API_KEY", None)
+        os.environ.pop("GOOGLE_API_KEY", None)
         os.environ.pop("OPENAI_API_KEY", None)
 
     def test_disabled_mode_uses_deterministic_candidate_metadata(self) -> None:
@@ -45,7 +50,7 @@ class LlmRelevanceFactorTest(unittest.TestCase):
 
     def test_llm_candidates_are_validated_against_deterministic_factors(self) -> None:
         os.environ["USE_LLM_RELEVANCE_FACTORS"] = "true"
-        os.environ["OPENAI_API_KEY"] = "test-key"
+        os.environ["GEMINI_API_KEY"] = "test-key"
         llm_payload = {
             "candidate_factors": [
                 {"factor": "watched_port_match", "evidence": "The article mentions Chittagong port.", "confidence": 0.88},
@@ -67,7 +72,7 @@ class LlmRelevanceFactorTest(unittest.TestCase):
 
     def test_llm_failure_falls_back_to_deterministic_metadata(self) -> None:
         os.environ["USE_LLM_RELEVANCE_FACTORS"] = "true"
-        os.environ["OPENAI_API_KEY"] = "test-key"
+        os.environ["GEMINI_API_KEY"] = "test-key"
         with patch("app.services.llm_relevance_factor_service._extract_candidate_factors", side_effect=TimeoutError()):
             metadata = build_factor_metadata(self.case, self.event, ["watched_port_match"])
 

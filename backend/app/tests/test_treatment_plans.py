@@ -13,7 +13,10 @@ class LLMActionPlanFlowTest(unittest.TestCase):
     def setUp(self) -> None:
         os.environ["USE_LLM_SUMMARY"] = "false"
         os.environ["REQUIRE_LLM_AGENT"] = "false"
-        os.environ["OPENAI_API_KEY"] = "test-key"
+        os.environ["LLM_PROVIDER"] = "gemini"
+        os.environ["GEMINI_API_KEY"] = "test-key"
+        os.environ["GOOGLE_API_KEY"] = ""
+        os.environ["OPENAI_API_KEY"] = ""
         os.environ["EVENT_SOURCE_MODE"] = "MOCK"
         reset_store()
         reset_document_store()
@@ -116,6 +119,8 @@ class LLMActionPlanFlowTest(unittest.TestCase):
 
     def test_llm_failure_does_not_create_action_set(self) -> None:
         case_id = self.confirmed_analyzed_case()
+        os.environ["GEMINI_API_KEY"] = ""
+        os.environ["GOOGLE_API_KEY"] = ""
         os.environ["OPENAI_API_KEY"] = ""
         response = self.client.post(f"/api/cases/{case_id}/action-sets/generate")
         self.assertEqual(response.status_code, 503)

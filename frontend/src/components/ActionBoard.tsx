@@ -96,7 +96,7 @@ export function ActionBoard({ caseId, actionSets, language, onActionSetsChange, 
         </div>
       </div>
       {!selectedSet ? <div className="empty-block"><h3>No LLM actions yet</h3><p>Run monitoring, then generate action candidates.</p></div> : <>
-        <div className="notice">{selectedSet.action_set_id} · Version {selectedSet.version} · {selectedSet.status} · {selectedSet.model}</div>
+        <div className="notice">{selectedSet.action_set_id} · Version {selectedSet.version} · {selectedSet.status}</div>
         {editable && <div className="inline-actions action-review-controls"><label><input type="checkbox" checked={selectedCount === editingActions.length && editingActions.length > 0} onChange={(event) => setEditingActions((items) => items.map((item) => ({ ...item, selected: event.target.checked })))} /> Select all</label><span>{selectedCount} selected</span><button className="primary-action" type="button" onClick={confirm} disabled={busy || selectedCount === 0}>Confirm Selected Actions</button></div>}
         <div className="action-grid">
           {editingActions.map((action) => (

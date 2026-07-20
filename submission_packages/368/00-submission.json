@@ -1,0 +1,383 @@
+{
+  "schema_version": "vibe-a-thon-submission/v3",
+  "submission_id": "368",
+  "updated_at": "2026-07-20T01:13:54+00:00",
+  "basic": {
+    "title": "ForeSail",
+    "team_name": "",
+    "track": "真",
+    "one_liner": "为跨境外贸操作员，在一笔货从签约到到港的全过程中，把外部世界（天气/地缘/港口/航道）对照这笔单自己的合同条款，算出谁的风险、哪个截止期要爆、该发什么，赶在损失落地前给出可执行动作。",
+    "contestant_name_certificate": "Zhou Yuxuan",
+    "has_team": true,
+    "team_member_names_certificate": [
+      "Jin Yanyu",
+      "Zhou Yuxuan"
+    ],
+    "contact": {
+      "name": "Zhou Yuxuan",
+      "email": "jinyanyu@u.nus.edu",
+      "phone": "+65 83710994",
+      "wechat": "19883688679"
+    },
+    "members": [
+      "Jin Yanyu",
+      "Zhou Yuxuan"
+    ],
+    "target_markets": [
+      "中国（出口商，首发）",
+      "阿联酋 / 中东",
+      "东南亚"
+    ],
+    "languages": [
+      "English",
+      "简体中文"
+    ],
+    "status": "可运行 Demo（前后端已线上部署：https://fore-sail.vercel.app ；核心链路 188 项后端测试通过）",
+    "xiaohongshu_url": "http://xhslink.com/o/9PaZi0qLgq3"
+  },
+  "problem": {
+    "target_users": "国际贸易商与进出口企业中处理同一笔交易的多类角色：贸易运营/物流（订舱、船期、港口异常）、贸易融资（信用证、交单、银行沟通）、风险/保险（覆盖与转移）、财资（FX、融资、现金流）、采购/销售，以及承担风险与成本取舍的管理层审批人。",
+    "scenario": "一笔跨境交易正在履行中（已签约、订舱，多为信用证结算、货走海运）。当航线上出现天气、海峡/运河绕航、港口拥堵、海盗、地缘政治或贸易政策等外部事件时，相关信息分散在合同、PDF、邮件、银行与保险回复及多个外部数据源里，团队需要在短时间内同时判断：这事和本交易相不相关？会落到运输/合同/保险/LC/付款/价格中的哪一环？在什么时间前该向谁发起什么动作？",
+    "current_workaround": "现有系统各自解决一段：航运平台看船舶与港口状态、CTRM/TMS 管订单与资金、银行平台执行 FX、保险经纪处理保单、贸易融资团队查信用证。真正缺失的是把『外部事件』映射到『这一笔交易该采取什么动作』的跨域编排层——目前主要靠人工在多个系统与邮件之间拼接判断。",
+    "pain_points": [
+      "中断发生时需同时处理多条线索（船期、港口、天气、海盗/战争、Incoterm 责任、保险、LC 期限、付款、FX、融资），信息分散在合同/PDF/邮件/银行与保险回复/多个外部数据源，时间紧、容易遗漏。",
+      "缺少跨域编排层：现有工具各管一段，没人把外部事件转成『这笔单的具体敞口 → 合同义务 → 截止时间 → 动作』并持续推进。",
+      "外部事件可能冲击 ETA、最迟装运日、LC 交单/有效期、资金占用或价格，人工难以及时把事件与合同条款、期限对齐。",
+      "Incoterm 责任划分与保险覆盖缺口（如战争/海盗/绕航是否在保）需逐单判断，判错会把风险或损失落到错误一方。"
+    ],
+    "evidence_summary": "问题定义来自团队《跨境交易中断与风险处置 Agent》项目设计文档 v1.0（2026-06）；并做了一手用户访谈——与一家跨境电商进口团队的从业者深度交流，对方以真实经历印证核心痛点：『之前有中东的一批货，供应商就死活运不过来，我们就断了好久』，并明确表示『想研究这种风险是不是可以被覆盖和预测，这种情况其实还挺普遍』；对方现状是没有内部风险判断系统、主要靠上游供应商信息临时补救（有风险时才从日韩等渠道扫货）。访谈还带来一个关键印证：进口/跨境电商中介与出口商其实是同一笔交易的买卖两侧，受访者自己提出『你们和商家的订单其实可以视作一笔正常的外贸交易』——正好印证 ForeSail 以单笔 trade Case 为单位、支持买卖双视角的产品模型，并揭示进口/中介是一个同样强需求的用户群。主 demo 与线上 demo 挂载 2026 霍尔木兹危机的真实公开报道事件（带来源，见 backend/app/data/curated_events.json）。当前样本仍小（1 场深度访谈），痛点普遍性与付费意愿待扩大样本验证。",
+    "evidence_links": [],
+    "research_count": 1,
+    "representative_feedback": "跨境电商进口团队从业者：『之前有中东的一批货，供应商就死活运不过来，我们就断了好久。我们就想研究一下这种风险是不是可以被覆盖和预测，这种情况其实还挺普遍的。』谈到现状：『（我们）没有内部管理系统来做风险判断，主要还是供应商那边的信息。』并指出：下单与到货之间有周期 gap，风险若发生在 gap 中、钱已付而货运不过来，就产生实打实的损失。",
+    "unvalidated_assumptions": [
+      "目标客户中以 LC 结算、受最迟装运日/交单期约束的订单占比足够高，值得单独产品守护。",
+      "外贸团队愿意为『外部风险决策与归属』这一层单独付费，而非并入现有单证执行工具。"
+    ]
+  },
+  "solution": {
+    "summary": "ForeSail 把每笔货当作一个持续存在的 trade Case：从合同/订舱确认/信用证中抽取并确认贸易要素，映射 Incoterm 责任划分与义务/期限日历，持续扫描外部事件并只挑出真正触及本单的，再由确定性可审计引擎算出暴露、判定风险归属、推进 case 状态，生成带证据、可直接发送的对外动作草稿。所有风险打分/分类/暴露映射/状态流转/日期与金额计算都由确定性引擎产出——agent 只负责编排流程与文书润色，从不自己编造风险分数。",
+    "user_value": "把原本靠人工盯新闻拍脑袋的外部风险判断，变成针对这一笔单的具体预警：哪个截止期现在有风险、在 Incoterm 下谁真正暴露、该发什么，而且还有时间处置——每条结论都可追溯、可放到一笔钱的决策面前。",
+    "user_flow": [
+      "1. 上传单据（合同/PO、订舱确认、信用证）建立一个 trade Case。",
+      "2. 复核系统抽取的贸易要素字段（每字段带证据文本与置信度），逐字段 approve/edit/reject。",
+      "3. 解决跨单据的字段冲突。",
+      "4. 确认 case facts（同时自动判定我方座位：卖方/买方）。",
+      "5. 运行 Agent 监控 / 生成动作：拉取真实外部事件 → 相关性判定 → 暴露映射 → 义务/期限映射 → 生成动作与对外草稿。",
+      "6. 复核并确认推荐动作。",
+      "7. 生成并复核处置方案（treatment plan）。",
+      "8. 持续监控，case 状态随之在 DRAFT→ACTIVE→WATCHING→AT_RISK→ACTION_REQUIRED→MONITORING 间推进。（案例详情页顶部有这 8 步进度条；也可直接打开预置的已跑案例查看完整分析结果。）"
+    ],
+    "core_features": [
+      {
+        "name": "单据抽取与要素确认",
+        "problem": "把非结构化的合同/订舱/信用证变成可信、可核验的结构化贸易要素。",
+        "input": "TXT / DOCX / 文本 PDF 格式的合同/PO、订舱确认、信用证。",
+        "processing": "确定性规则抽取 +（可选）LLM 抽取，输出带证据文本与置信度的字段，支持逐字段人工核对。",
+        "output": "带证据、可 approve/edit/reject 的贸易要素字段，及确认后的 case facts。",
+        "runnable_status": "完整可用（真实解析 TXT/DOCX/文本 PDF，扫描件 OCR 在 roadmap）。",
+        "evidence_location": "README「Supported Demo Flow」；backend/app/services/document_service.py"
+      },
+      {
+        "name": "Case 相关性引擎",
+        "problem": "从海量外部新闻/天气中过滤掉与本单无关的噪音。",
+        "input": "外部事件流 + 本 case 的监控画像（船舶、港口、航段区域、期限敏感度）。",
+        "processing": "确定性打分与分类，只保留真正触及这笔单的事件。",
+        "output": "带分数的事件相关性结果，滤除新闻噪音。",
+        "runnable_status": "完整可用。",
+        "evidence_location": "前端 Event Relevance Results；backend/app/services/relevance_engine.py"
+      },
+      {
+        "name": "Incoterms 风险归属引擎",
+        "problem": "同一事件在不同 Incoterm 下归属相反，人工易判错责任方。",
+        "input": "合同术语（CIF/FOB 等 11 种）+ 自动判定的我方座位 + 事件所处航段。",
+        "processing": "确定性 Incoterms 2020 风险转移规则，判定谁的风险/谁能动手/要不要你管。",
+        "output": "每条事件的三判定与 attribution note（如『你是 CIF 卖方，货已装船风险转买方，但你仍控主运且收款风险未消』）。",
+        "runnable_status": "完整可用。",
+        "evidence_location": "backend/app/services/incoterm_rule_service.py、perspective_detection_service.py；hazard 卡 attribution note"
+      },
+      {
+        "name": "预测层：航程 × 预报对齐",
+        "problem": "让风险在船开进去之前就浮现，而不是损失落地后才知道。",
+        "input": "航程时刻表 + 16 天气象预报 + 台风路径 + 地缘走廊状态。",
+        "processing": "航程与预报的时空对齐、台风路径锥、地缘走廊状态机。",
+        "output": "在船驶入风险前给出的暴露预警与风险日历。",
+        "runnable_status": "完整可用。",
+        "evidence_location": "前端地图/风险日历；backend 预测层服务与 Open-Meteo/台风连接器"
+      },
+      {
+        "name": "确定性可审计决策核 + 对外动作草稿",
+        "problem": "把风险判断变成可信、可追溯、可直接发送的处置动作。",
+        "input": "暴露、义务与期限。",
+        "processing": "确定性 exposure/deadline/status 状态机产出决策；LLM 仅润色文书措辞，从不参与打分。",
+        "output": "带证据的处置建议与可发送对外草稿（LC amendment、承运人询问、保险澄清、RFQ 等）。",
+        "runnable_status": "部分可用（生成 ticket 与外发草稿，但不做真实成交，MVP 边界）。",
+        "evidence_location": "前端 Recommended Action Board / Action Drafts；backend agent 编排层"
+      }
+    ]
+  },
+  "demo": {
+    "url": "https://fore-sail.vercel.app",
+    "access_method": "浏览器 Web 应用（前端 Vercel + 后端 Render，无需登录）。首次访问有引导浮层，可随时点右上角『?』重放。",
+    "recommended_environment": "桌面端 Chrome / Edge 最新版，正常网络；首次访问若后端休眠需等待数十秒冷启动。",
+    "experience_steps": [
+      {
+        "action": "打开 Demo（https://fore-sail.vercel.app）。首次访问会弹出『Welcome to ForeSail』引导；老访客可随时点右上角『?』(Replay guided tour) 重放引导。点『Set up my first case →』开始——之后引导会逐页高亮、一步步带你走完整个流程。",
+        "expected_result": "进入新建 Case / 上传单据页，引导卡片开始逐步高亮讲解（Intake → Monitor → Treat 三段）。"
+      },
+      {
+        "action": "上传单据：把合同 / 信用证 / 订舱 / 提单拖进文档槽。三种取材皆可——① 用你自己的单据；② 点页面上的『load a ready-made sample document set』载入内置样例；③ 用随本材料包附带的样例单据 evidence/demo-case-documents/（contract、booking_confirmation、letter_of_credit）。然后点『Extract』抽取事实，完成后点『Continue to Review』进入 case 工作台。",
+        "expected_result": "系统从单据中抽取交易事实并标出跨单据冲突；抽取字段带证据来源。该文档抽取的 LLM 层由 Google Gemini 驱动（见 04-google-technology.md 与 backend/app/services/llm_provider.py）。"
+      },
+      {
+        "action": "在 Documents & Evidence：先确认『座位』（系统读单据当事人判定你是卖方/买方，如 LC beneficiary = 卖方）→『Accept all』批准抽取字段 →『Confirm Fields』锁定确认事实 → 点右上『Run Agent Monitoring Cycle』跑第一轮监控。",
+        "expected_result": "确认事实后监控按钮解锁；点击后 agent 拉取外部事件、按本 case 打分、浮现触及本单的风险。"
+      },
+      {
+        "action": "按引导巡览 Overview 与信号来源：Overview（Route alerts 点卡片联动地图、Route risk map 点风险看归属 note、Shipment facts、红/绿 Exposure flags）→ External Events（全球航运走廊状态板 +『Search Real External Events』实时拉真实新闻源（gCaptain、Maritime Executive 等，事件带可点的真实来源链接）与天气）→ Risks & Obligations（截止期倒计时矩阵 + 相关性打分 + CIF 下买/卖方归属）。",
+        "expected_result": "看到风险如何从真实外部信号 → 打分 → 落到本单的义务 / 期限 / 责任方；地图与走廊状态板随之高亮本航线。"
+      },
+      {
+        "action": "按引导完成处置闭环：Actions（Generate Actions → 勾选 / 编辑 → 确认）→ Treatment Plans（由确认动作生成方案 + 生成审批包）→ Audit（查看从 intake 到 treatment 的完整时间线）。",
+        "expected_result": "确认的动作汇入处置方案；Treatment Plans 生成可审批方案；Audit 显示全程可追溯时间线，引导在此收尾。"
+      }
+    ],
+    "expected_duration_minutes": 5,
+    "known_issues": [
+      "Render 免费后端闲置后会休眠，首次访问需数十秒冷启动。",
+      "演示环境使用本地 SQLite 与本地上传目录，属临时存储，重启/重部署后数据可能清空（适合 demo，非生产存储）。",
+      "文档抽取目前支持 TXT/DOCX/文本 PDF，扫描件图片 PDF 的 OCR 尚在 roadmap。"
+    ],
+    "fallback_download_url": "",
+    "published_channel": "",
+    "published_product_name": "",
+    "support_contact": "",
+    "availability_confirmed": true,
+    "automated_testing_consent": true,
+    "access_restricted": false,
+    "private_access_file": "private/08-test-access.md"
+  },
+  "video": {
+    "url": "https://drive.google.com/file/d/1DJ9CeQ73f3fZdU9pqNWq_Lyz3mlROCGO/view?usp=sharing",
+    "duration_minutes": 5,
+    "contents_confirmed": {
+      "demo": true,
+      "user_problem": true,
+      "google_technology": true,
+      "innovation": false,
+      "localization": false
+    },
+    "timecodes": {
+      "problem": "",
+      "demo": "",
+      "google_technology": "",
+      "innovation": "",
+      "localization": ""
+    }
+  },
+  "google_technology": [
+    {
+      "name": "Google Gemini API（默认 LLM 提供方）",
+      "capability": "gemini-3.1-flash-lite，用于长文本理解与受约束的结构化 JSON 输出；通过 Gemini 的 OpenAI 兼容端点（https://generativelanguage.googleapis.com/v1beta/openai）统一接入。当前 .env：LLM_PROVIDER=gemini，USE_LLM_EXTRACTION=true，LLM_FALLBACK_ENABLED=false。",
+      "feature": "贸易单据智能抽取——把合同 / 订舱确认 / 信用证的自由文本解析为可核验的结构化贸易要素。",
+      "input": "单据解析后的全文文本（支持 TXT / DOCX / 文本 PDF）、允许抽取的 25 类字段白名单，以及约束返回格式的 JSON schema。",
+      "processing": "Gemini 在 temperature=0、response_format=json_object 的强约束下，抽取买卖方、商品、金额、币种、Incoterm、装运与交单期限、当事人角色等字段，并为每个字段附上证据文本与置信度；系统提示明确限定其只做事实抽取，不得推断风险等级、责任归属、冲突或审批结论。",
+      "output": "带证据文本与置信度的结构化字段 JSON，进入前端逐字段 approve / edit / reject 的人工确认流程，成为整条风险链路的可信输入。",
+      "role": "支撑",
+      "selection_reason": "贸易单据是半结构化长文本、格式多样，Gemini 的长上下文理解与结构化输出适合在零微调下完成多字段抽取；OpenAI 兼容端点让既有请求结构保持不变。",
+      "removal_impact": "移除后系统回退到确定性规则抽取，demo 仍可跑通但字段覆盖度与鲁棒性下降；风险打分、归属、状态与期限决策不受影响。",
+      "evidence_location": "backend/app/services/llm_provider.py；backend/app/services/document_service.py::_llm_extract_fields；README「LLM Provider / Optional LLM Extraction」。"
+    },
+    {
+      "name": "Google Gemini API（Agent Run Summary）",
+      "capability": "gemini-3.1-flash-lite，用于面向用户的自然语言摘要生成。当前 .env：USE_LLM_SUMMARY=true，REQUIRE_LLM_AGENT=true，GEMINI_SUMMARY_TIMEOUT_SECONDS=60。",
+      "feature": "Agent 监控循环的运行摘要——把一次监控的确定性结果转写成操作员可读摘要。",
+      "input": "本次运行的确定性事实 JSON：相关性结果、敞口、风险摘要、处于风险的义务、信息缺口与动作草稿计数。",
+      "processing": "Gemini 在“只允许复述既有事实、禁止产生新的打分 / 分类 / 状态 / 日期 / 动作决策”的约束下，把结构化结果转写为简洁摘要。",
+      "output": "一段展示在前端 Agent Run Summary 面板的可读摘要。",
+      "role": "支撑",
+      "selection_reason": "运行摘要是语言组织任务，适合用 Gemini 统一处理，同时保留确定性 fallback。",
+      "removal_impact": "移除后回退到确定性模板摘要；核心监控结果与风险判定不受影响。",
+      "evidence_location": "backend/app/services/agent_summary_service.py::_llm_summary；backend/app/services/llm_provider.py；README「Optional LLM Summary」。"
+    },
+    {
+      "name": "Google Gemini API（相关性因子候选提取）",
+      "capability": "gemini-3.1-flash-lite，用于从 case watch profile 与外部事件文本中提出候选 relevance factors。当前 .env：USE_LLM_RELEVANCE_FACTORS=true，GEMINI_RELEVANCE_FACTOR_TIMEOUT_SECONDS=20。",
+      "feature": "事件相关性解释增强——为外部事件提取候选匹配因子、缺失直接证据与简短解释。",
+      "input": "case watch profile（船舶、港口、航线区域、期限等）、外部事件标题/描述/影响范围，以及允许的 relevance factor 白名单。",
+      "processing": "Gemini 只提出候选因子；系统随后用确定性规则校验候选是否在白名单内、是否有证据、是否被 deterministic case/event validation 支持。",
+      "output": "validated_factors、rejected_factors、missing_direct_evidence 与解释摘要，供评委/用户理解相关性来源。",
+      "role": "支撑",
+      "selection_reason": "LLM 适合从非结构化事件文本中提取可解释候选因子，但最终是否进入评分仍由确定性校验决定。",
+      "removal_impact": "移除后使用确定性 relevance factors；最终分数与分类仍由 relevance engine 决定。",
+      "evidence_location": "backend/app/services/llm_relevance_factor_service.py；backend/app/services/relevance_engine.py。"
+    },
+    {
+      "name": "Google Gemini API（动作候选生成）",
+      "capability": "gemini-3.1-flash-lite，用于在严格 JSON schema 下生成可执行 trade-risk action candidates。当前 .env：GEMINI_ACTION_MODEL=gemini-3.1-flash-lite，GEMINI_ACTION_TIMEOUT_SECONDS=60。",
+      "feature": "Recommended Action Board / Actions——基于已确认事实、风险摘要、义务、信息缺口和 hazard，生成可编辑、可确认的动作候选。",
+      "input": "已确认 case facts、relevance results、risk summary、obligations、information gaps、hazards 与 Incoterm responsibility。",
+      "processing": "Gemini 生成结构化 actions；系统用 schema、优先级枚举、responsible party 枚举、hazard/obligation/exposure ID 校验与清洗，禁止重新分类事件、改变 case 状态或编造法律结论。",
+      "output": "候选 action set，用户可选择、编辑并确认，确认后才进入后续处置方案。",
+      "role": "支撑",
+      "selection_reason": "动作草稿需要把确定性风险结果转成操作语言，Gemini 能提升可读性与可执行性，同时由代码校验约束。",
+      "removal_impact": "移除后动作候选生成不可用或需人工编写，但底层风险识别、归属和状态机不受影响。",
+      "evidence_location": "backend/app/services/action_set_service.py；backend/app/services/structured_llm_service.py。"
+    },
+    {
+      "name": "Google Gemini API（处置方案草稿生成）",
+      "capability": "gemini-3.1-flash-lite，用于在严格 JSON schema 下生成 LOW_COST / BALANCED / MAX_PROTECTION 三类 treatment plans。当前 .env：GEMINI_PLAN_MODEL=gemini-3.1-flash-lite，GEMINI_PLAN_TIMEOUT_SECONDS=60。",
+      "feature": "Treatment Plans——基于用户已确认的动作集合，生成三种处置方案、残余风险、审批角色与推荐方案。",
+      "input": "已确认 case facts、已确认 actions、risk summary、obligations、information gaps、hazards 与 Incoterm responsibility。",
+      "processing": "Gemini 生成 exactly three plans；系统校验方案类型、唯一 recommended plan、linked action/gap/obligation ID 是否存在，禁止引用未确认动作或未知标识。",
+      "output": "可供审批与选择的三套处置方案，以及对应 residual risks 和 approval package 输入。",
+      "role": "支撑",
+      "selection_reason": "方案草稿是跨多个已确认动作的语言与结构化组织任务，适合由 Gemini 生成后由 deterministic/schema 校验守住边界。",
+      "removal_impact": "移除后不能自动生成方案草稿，但不影响前置风险检测、责任归属、义务/期限计算和动作确认。",
+      "evidence_location": "backend/app/services/treatment_plan_service.py；backend/app/services/structured_llm_service.py。"
+    }
+  ],
+  "technical": {
+    "architecture_file": "",
+    "repository_url": "https://github.com/jinyy20021018-design/ForeSail",
+    "commit_id": "5363a24aa5f1fe5e70bf1c0a5d1fb2079541a1de",
+    "code_evidence_paths": [
+      "backend/app/services/llm_provider.py — Gemini 提供方解析、OpenAI 兼容端点与模型选择",
+      "backend/app/services/document_service.py — Gemini 文档抽取调用与 fallback",
+      "backend/app/services/agent_summary_service.py — Gemini Agent Run Summary",
+      "backend/app/services/llm_relevance_factor_service.py — Gemini 相关性因子候选提取 + 确定性校验",
+      "backend/app/services/action_set_service.py — Gemini 动作候选生成 + schema/ID 校验",
+      "backend/app/services/treatment_plan_service.py — Gemini 三方案生成 + schema/ID 校验",
+      "backend/app/services/relevance_engine.py — Case 相关性确定性打分引擎",
+      "backend/app/services/incoterm_rule_service.py — Incoterms 风险归属规则",
+      "backend/app/agents/monitoring_agent.py — Agent 编排层（不参与打分/日期计算）"
+    ],
+    "deployment_notes": "后端 FastAPI（Python 3.10）部署于 Render（Root: backend, Start: uvicorn app.main:app），前端 React/Vite 部署于 Vercel（Build: npm run build, Output: dist）。免费演示配置可无付费 API 运行：外部事件默认 REAL 模式接 Open-Meteo/GDELT/RSS，LLM 抽取/摘要可关闭并回退确定性实现。",
+    "dependencies": [
+      "FastAPI + Uvicorn（Python 3.10 后端）",
+      "React + Vite + Leaflet（前端）",
+      "Open-Meteo（天气/16 天预报，真实连接器）",
+      "GDELT（全球新闻，真实连接器）",
+      "RSS 搜索连接器（gCaptain / FreightWaves 等航运源）",
+      "searoute（任意港口对海运航线计算）",
+      "Google Gemini API（默认 LLM 提供方，gemini-3.1-flash-lite，经 OpenAI 兼容端点；用于文档抽取、Agent 摘要、相关性因子候选、动作候选和处置方案草稿）"
+    ],
+    "confidentiality_notes": ""
+  },
+  "innovation": {
+    "technical": [
+      {
+        "title": "确定性可审计风险内核（LLM 从不打分）",
+        "common_approach": "多数 AI 风控/助手让 LLM 直接输出风险分数、判定或金额。",
+        "difference": "ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎，LLM 只做文档抽取与文书润色，架构上禁止 LLM 编造风险分数。",
+        "effect": "每条风险结论可追溯、可审计、可复现，安全到能放到一笔钱的决策面前，而不是黑箱概率。",
+        "evidence_location": "README『Trustworthy by design / Agent Orchestration』；backend/app/agents/monitoring_agent.py 明确不做打分与日期计算。"
+      },
+      {
+        "title": "Incoterms 风险归属引擎 + per-Case 座位自动判定",
+        "common_approach": "航运风险产品通常只做通用事件告警，不区分同一事件在不同贸易术语/买卖视角下的责任归属。",
+        "difference": "从单据当事人字段自动判定我方座位（LC beneficiary/shipper→卖方，applicant/consignee→买方），再用确定性 Incoterms 2020 规则把同一事件映射为『谁的风险/谁能动手/要不要你管』。",
+        "effect": "同一条台风或海峡新闻，对 CIF 卖方和 FOB 买方给出相反且正确的归属，并作为第二把降噪锁过滤掉与我方无关的事件。",
+        "evidence_location": "backend/app/services/incoterm_rule_service.py、perspective_detection_service.py；demo 中 SELLER/BUYER 两个对照端点。"
+      },
+      {
+        "title": "预测层：航程 × 气象预报 / 台风锥 / 地缘走廊状态机对齐",
+        "common_approach": "常见做法是事件发生后再告警（反应式）。",
+        "difference": "把航程时刻与 16 天预报、台风路径锥、地缘走廊状态机做时空对齐，在船驶入风险前就让暴露浮现。",
+        "effect": "风险从『损失落地后通知』变成『装船/驶入前预警』，为处置留出时间窗。",
+        "evidence_location": "backend 预测层与 Open-Meteo/台风连接器；前端地图与风险日历。"
+      }
+    ],
+    "product_experience": [
+      {
+        "title": "从『新闻推送』重构为『这笔单、这个截止期、谁暴露、发什么』",
+        "common_approach": "现有工具给的是通用航运/天气新闻流或宽泛告警，需要用户自己判断相关性和责任。",
+        "difference": "ForeSail 以单笔 trade Case 为状态单位，把外部事件直接落到本单的义务/期限/责任方上，并给出可发送的对外草稿。",
+        "effect": "操作员不再『看到一堆新闻自己想办法』，而是直接得到一笔单可执行、带证据的处置建议。",
+        "evidence_location": "前端 Recommended Action Board / Action Drafts / hazard attribution note。"
+      },
+      {
+        "title": "切『风险决策与处置』层，与执行自动化竞品互补而非硬拼",
+        "common_approach": "国内外贸数字化竞品主要做『执行自动化』——如九科信息偏对内 RPA、未斯科技做单证执行自动化，把托书/订舱/改单/单证等流程自动化。",
+        "difference": "ForeSail 不在执行层与它们硬拼，而是切它上面的『风险决策与处置』层：把外部事件转成本单的敞口 / 义务 / 期限 / 归属，再给出处置建议，可架在执行层之上、与其互补。",
+        "effect": "避开执行自动化红海，占住『外部风险决策』这个尚未被数字化覆盖的空位——一手用户访谈也印证『外贸系统数字化做得比较少』。",
+        "evidence_location": "竞品资料见 竞品/（交通物流行业自动化方案介绍、未斯科技公司介绍）；problem 中的用户访谈证据。"
+      }
+    ]
+  },
+  "market": {
+    "first_market": "先服务中国出口商中的中小外贸企业（长三角/珠三角的光伏、机电等，以 CIF/LC 海运出口、航线高频经过霍尔木兹/红海/东南亚等高风险走廊者），再顺着其贸易对手方向东南亚/中东买方侧扩展。",
+    "market_rationale": "团队对中国出口商的单据与 Incoterms 场景最熟；这类企业单笔订单金额大、受 LC 最迟装运日/交单期等硬期限强约束、且航线高频撞上霍尔木兹/红海/台风带，外部风险痛点最强、最愿意为“守住收款”买单。",
+    "user_acquisition": "①与货代/报关行合作触达其外贸客户；②在小红书等内容平台用真实案例（如霍尔木兹海峡危机 case）做展示获客；③垂直外贸社群、论坛与展会获取种子用户。",
+    "usage_conditions": "使用产品需要：可访问的浏览器、正常网络，以及该笔交易的合同/订舱/信用证等单据（TXT/DOCX/文本 PDF）；无需安装。",
+    "barriers": [
+      "外贸风控涉及资金决策，企业对『AI 给的风险结论是否可信/可审计』门槛高（ForeSail 以确定性内核正面回应）。",
+      "外部数据连接器（AIS/港口/银行/保险/FX 等）的真实接入与商务合作。",
+      "信任与合规：输出为决策辅助、非法律/银行意见，需明确免责与人工审批闭环。"
+    ],
+    "cost_range": "",
+    "social_impact_path": "",
+    "impact_metrics": [],
+    "six_month_plan": ""
+  },
+  "localization": {
+    "target_culture": "以中国出口商/进口商为首批服务对象；产品界面提供英文与简体中文双语，业务语义对齐国际贸易通用术语（Incoterms 2020、信用证 UCP 惯例）。",
+    "habits": [
+      "外贸从业者日常以英文单据与国际术语沟通，但内部团队更习惯中文界面与说明。",
+      "以信用证/Incoterms 为结算与责任框架，对最迟装运日、交单期等硬期限高度敏感。"
+    ],
+    "user_concerns": [
+      "对 AI 输出用于资金决策的可信度与可审计性有顾虑。",
+      "对单据与商业数据的隐私与保密有顾虑。"
+    ],
+    "adaptations": [
+      "en/zh 双语 i18n（frontend/src/i18n.ts），非仅翻译，业务文案按外贸语境撰写。",
+      "座位/归属按 Incoterms 2020 与信用证实务建模，贴合中国出口商作为 LC beneficiary 的典型场景。",
+      "确定性可审计内核直接回应本地企业对『AI 是否乱判』的信任顾虑。"
+    ],
+    "evidence": [
+      "真实格式的中国出口商 CIF 全套单据（合同 / 订舱确认 / 信用证），见 evidence/demo-case-documents/（contract.docx、booking_confirmation.docx、letter_of_credit.docx、README.txt）。这套单据按目标市场（中国出口商、CIF、LC、经霍尔木兹海峡的海运）真实场景撰写，用于验证产品对该市场单据与 Incoterms/LC 惯例的处理；单据内交易日期已对齐至 2026-08～09，以保证评审期（含较晚时间）演示时期限仍为未来。评委可直接上传这套单据到线上 Demo 复现完整流程。",
+      "线上 Demo 预置案例的关键日期按『当日 + 偏移』动态生成（backend/app/services/case_service.py::_anchor_demo_dates），评委任意时间测试，截止期都保持在未来、不会过期。"
+    ],
+    "tested_with_local_users": false,
+    "test_count": 0,
+    "changes_after_testing": "目前有意向用户，但尚未让目标地区或文化背景的真实外部用户试用；因此没有基于试用反馈形成的本地化修改前后对比。当前本地化证据主要来自双语界面、真实格式中国出口商 CIF/LC 样例单据、Incoterms/信用证业务语义建模和可运行 Demo。"
+  },
+  "declarations": {
+    "existed_before_contest": true,
+    "new_work_during_contest": "比赛期间把 ForeSail 从『只有基础框架和很简单的 agent 架构』重写为一套完整、可运行、可审计的交易风险处置系统，主要新增工作包括：(1) 接入真实外部连接器 Open-Meteo（16 天气象预报）、GDELT（全球新闻）、RSS 航运源，替代早期桩数据；(2) 新建预测层——航程×气象预报时空对齐、台风路径锥、地缘走廊状态机与风险日历，把风险从『事后告警』提前到『驶入前预警』；(3) Incoterms 2020 风险归属引擎 + per-Case 座位自动判定（从单据当事人字段判定我方卖方/买方，输出『谁的风险/谁能动手/要不要你管』）；(4) 事件相关性引擎，对每条外部事件按本单监控画像打分降噪；(5) treatment/处置链路——义务与期限映射、信息缺口检测、带证据的对外动作草稿；(6) 确定性可审计内核（打分/分类/暴露/状态/日期全部确定性，LLM 从不打分），后端 188 项单元测试通过；(7) 前端全站重构并完成线上部署（Vercel 前端 + Render 后端）；(8) 接入 Google Gemini 作为默认 LLM 提供方，承担文档抽取与 agent 运行摘要。整条数据链（外部事件 → 相关性 → 敞口 → 义务/期限 → 处置草稿）在本次比赛期间打通并落地。",
+    "originality_confirmed": true,
+    "review_access_consent": true
+  },
+  "attachments": [
+    {
+      "path": "evidence/demo-case-documents/contract.docx",
+      "type": "technical",
+      "note": "Hormuz 演示案例·合同（Shanghai Solaris，CIF，交易日期对齐至 2026-08/09）。评委可把本套 3 份单据在 Demo 的『Create New Case』上传，复现完整 抽取→确认→监控 流程。"
+    },
+    {
+      "path": "evidence/demo-case-documents/booking_confirmation.docx",
+      "type": "technical",
+      "note": "Hormuz 演示案例·订舱确认（ETD 2026-08-28 / ETA 2026-09-15）。"
+    },
+    {
+      "path": "evidence/demo-case-documents/letter_of_credit.docx",
+      "type": "technical",
+      "note": "Hormuz 演示案例·信用证（最迟装运 2026-09-05 / LC 到期 2026-09-30）。"
+    },
+    {
+      "path": "evidence/demo-case-documents/README.txt",
+      "type": "technical",
+      "note": "Hormuz 演示案例单据说明。"
+    },
+    {
+      "path": "evidence/user-research/user-interview-notes.md",
+      "type": "user-research",
+      "note": "一手用户访谈纪要（脱敏）——跨境电商进口团队从业者，印证核心痛点、买卖双视角与进口/中介新用户群。"
+    },
+    {
+      "path": "evidence/technical/technical-evidence-index.md",
+      "type": "technical",
+      "note": "技术证据索引——仓库、188 测试、Gemini、实时真实新闻抓取等关键实现的代码位置，供评委核验。"
+    }
+  ]
+}
