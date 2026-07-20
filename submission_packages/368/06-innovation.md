@@ -5,9 +5,9 @@
 ### 1. 确定性可审计风险内核（LLM 从不打分）
 
 - 常见做法：多数 AI 风控/助手让 LLM 直接输出风险分数、判定或金额。
-- 本作品的不同：ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎，LLM 只做文档抽取与文书润色，架构上禁止 LLM 编造风险分数。
+- 本作品的不同：ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎；Gemini 只处理文档抽取、摘要、相关性因子候选、动作候选和处置方案草稿，后几类输出经过 schema、白名单或 ID 校验，架构上禁止 LLM 编造风险分数或状态决策。
 - 实际效果：每条风险结论可追溯、可审计、可复现，安全到能放到一笔钱的决策面前，而不是黑箱概率。
-- 证据位置：README『Trustworthy by design / Agent Orchestration』；backend/app/agents/monitoring_agent.py 明确不做打分与日期计算。
+- 证据位置：backend/app/services/relevance_engine.py（确定性相关性打分/分类）；backend/app/services/risk_mapper.py（暴露映射）；backend/app/services/status_machine.py（状态流转）；backend/app/agents/monitoring_agent.py（编排层，不直接做打分/日期计算）；backend/app/services/action_set_service.py 与 treatment_plan_service.py（Gemini 草稿输出经 schema/ID 校验）。
 
 ### 2. Incoterms 风险归属引擎 + per-Case 座位自动判定
 

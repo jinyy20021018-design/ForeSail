@@ -1,7 +1,7 @@
 {
   "schema_version": "vibe-a-thon-submission/v3",
   "submission_id": "368",
-  "updated_at": "2026-07-20T01:13:54+00:00",
+  "updated_at": "2026-07-20T01:17:32+00:00",
   "basic": {
     "title": "ForeSail",
     "team_name": "",
@@ -55,7 +55,7 @@
     ]
   },
   "solution": {
-    "summary": "ForeSail 把每笔货当作一个持续存在的 trade Case：从合同/订舱确认/信用证中抽取并确认贸易要素，映射 Incoterm 责任划分与义务/期限日历，持续扫描外部事件并只挑出真正触及本单的，再由确定性可审计引擎算出暴露、判定风险归属、推进 case 状态，生成带证据、可直接发送的对外动作草稿。所有风险打分/分类/暴露映射/状态流转/日期与金额计算都由确定性引擎产出——agent 只负责编排流程与文书润色，从不自己编造风险分数。",
+    "summary": "ForeSail 把每笔货当作一个持续存在的 trade Case：从合同/订舱确认/信用证中抽取并确认贸易要素，映射 Incoterm 责任划分与义务/期限日历，持续扫描外部事件并只挑出真正触及本单的，再由确定性可审计引擎算出暴露、判定风险归属、推进 case 状态，生成带证据、可审阅确认的对外动作和处置方案草稿。所有风险打分/分类/暴露映射/状态流转/日期与金额计算都由确定性引擎产出；Gemini 用于文档抽取、摘要、相关性因子候选、动作候选和处置方案草稿，并经过 schema、白名单或 ID 校验，不直接产生风险分数或状态决策。",
     "user_value": "把原本靠人工盯新闻拍脑袋的外部风险判断，变成针对这一笔单的具体预警：哪个截止期现在有风险、在 Incoterm 下谁真正暴露、该发什么，而且还有时间处置——每条结论都可追溯、可放到一笔钱的决策面前。",
     "user_flow": [
       "1. 上传单据（合同/PO、订舱确认、信用证）建立一个 trade Case。",
@@ -108,8 +108,8 @@
         "name": "确定性可审计决策核 + 对外动作草稿",
         "problem": "把风险判断变成可信、可追溯、可直接发送的处置动作。",
         "input": "暴露、义务与期限。",
-        "processing": "确定性 exposure/deadline/status 状态机产出决策；LLM 仅润色文书措辞，从不参与打分。",
-        "output": "带证据的处置建议与可发送对外草稿（LC amendment、承运人询问、保险澄清、RFQ 等）。",
+        "processing": "确定性 exposure/deadline/status 状态机产出风险与状态决策；Gemini 可基于已确认事实和确定性风险结果生成动作候选与处置方案草稿，输出再经过 schema、枚举、hazard/obligation/exposure ID 校验，并由用户确认。",
+        "output": "带证据的处置建议、可确认的动作候选、可发送对外草稿与三类 treatment plan 草稿。",
         "runnable_status": "部分可用（生成 ticket 与外发草稿，但不做真实成交，MVP 边界）。",
         "evidence_location": "前端 Recommended Action Board / Action Drafts；backend agent 编排层"
       }
@@ -268,9 +268,9 @@
       {
         "title": "确定性可审计风险内核（LLM 从不打分）",
         "common_approach": "多数 AI 风控/助手让 LLM 直接输出风险分数、判定或金额。",
-        "difference": "ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎，LLM 只做文档抽取与文书润色，架构上禁止 LLM 编造风险分数。",
+        "difference": "ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎；Gemini 只处理文档抽取、摘要、相关性因子候选、动作候选和处置方案草稿，后几类输出经过 schema、白名单或 ID 校验，架构上禁止 LLM 编造风险分数或状态决策。",
         "effect": "每条风险结论可追溯、可审计、可复现，安全到能放到一笔钱的决策面前，而不是黑箱概率。",
-        "evidence_location": "README『Trustworthy by design / Agent Orchestration』；backend/app/agents/monitoring_agent.py 明确不做打分与日期计算。"
+        "evidence_location": "backend/app/services/relevance_engine.py（确定性相关性打分/分类）；backend/app/services/risk_mapper.py（暴露映射）；backend/app/services/status_machine.py（状态流转）；backend/app/agents/monitoring_agent.py（编排层，不直接做打分/日期计算）；backend/app/services/action_set_service.py 与 treatment_plan_service.py（Gemini 草稿输出经 schema/ID 校验）。"
       },
       {
         "title": "Incoterms 风险归属引擎 + per-Case 座位自动判定",
@@ -344,7 +344,7 @@
   },
   "declarations": {
     "existed_before_contest": true,
-    "new_work_during_contest": "比赛期间把 ForeSail 从『只有基础框架和很简单的 agent 架构』重写为一套完整、可运行、可审计的交易风险处置系统，主要新增工作包括：(1) 接入真实外部连接器 Open-Meteo（16 天气象预报）、GDELT（全球新闻）、RSS 航运源，替代早期桩数据；(2) 新建预测层——航程×气象预报时空对齐、台风路径锥、地缘走廊状态机与风险日历，把风险从『事后告警』提前到『驶入前预警』；(3) Incoterms 2020 风险归属引擎 + per-Case 座位自动判定（从单据当事人字段判定我方卖方/买方，输出『谁的风险/谁能动手/要不要你管』）；(4) 事件相关性引擎，对每条外部事件按本单监控画像打分降噪；(5) treatment/处置链路——义务与期限映射、信息缺口检测、带证据的对外动作草稿；(6) 确定性可审计内核（打分/分类/暴露/状态/日期全部确定性，LLM 从不打分），后端 188 项单元测试通过；(7) 前端全站重构并完成线上部署（Vercel 前端 + Render 后端）；(8) 接入 Google Gemini 作为默认 LLM 提供方，承担文档抽取与 agent 运行摘要。整条数据链（外部事件 → 相关性 → 敞口 → 义务/期限 → 处置草稿）在本次比赛期间打通并落地。",
+    "new_work_during_contest": "比赛期间把 ForeSail 从『只有基础框架和很简单的 agent 架构』重写为一套完整、可运行、可审计的交易风险处置系统，主要新增工作包括：(1) 接入真实外部连接器 Open-Meteo（16 天气象预报）、GDELT（全球新闻）、RSS 航运源，替代早期桩数据；(2) 新建预测层——航程×气象预报时空对齐、台风路径锥、地缘走廊状态机与风险日历，把风险从『事后告警』提前到『驶入前预警』；(3) Incoterms 2020 风险归属引擎 + per-Case 座位自动判定（从单据当事人字段判定我方卖方/买方，输出『谁的风险/谁能动手/要不要你管』）；(4) 事件相关性引擎，对每条外部事件按本单监控画像打分降噪；(5) treatment/处置链路——义务与期限映射、信息缺口检测、带证据的对外动作草稿和三类处置方案草稿；(6) 确定性可审计内核（打分/分类/暴露/状态/日期全部确定性，LLM 从不打分），后端 188 项单元测试通过；(7) 前端全站重构并完成线上部署（Vercel 前端 + Render 后端）；(8) 接入 Google Gemini 作为默认 LLM 提供方，承担文档抽取、Agent 摘要、相关性因子候选、动作候选和处置方案草稿。整条数据链（外部事件 → 相关性 → 敞口 → 义务/期限 → 动作与处置方案草稿）在本次比赛期间打通并落地。",
     "originality_confirmed": true,
     "review_access_consent": true
   },
