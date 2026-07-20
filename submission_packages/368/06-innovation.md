@@ -4,10 +4,10 @@
 
 ### 1. 确定性可审计风险内核（LLM 从不打分）
 
-- 常见做法：多数 AI 风控/助手让 LLM 直接输出风险分数、判定或金额。
-- 本作品的不同：ForeSail 把打分/分类/暴露映射/状态流转/日期与金额全部交给确定性引擎；Gemini 只处理文档抽取、摘要、相关性因子候选、动作候选和处置方案草稿，后几类输出经过 schema、白名单或 ID 校验，架构上禁止 LLM 编造风险分数或状态决策。
-- 实际效果：每条风险结论可追溯、可审计、可复现，安全到能放到一笔钱的决策面前，而不是黑箱概率。
-- 证据位置：backend/app/services/relevance_engine.py（确定性相关性打分/分类）；backend/app/services/risk_mapper.py（暴露映射）；backend/app/services/status_machine.py（状态流转）；backend/app/agents/monitoring_agent.py（编排层，不直接做打分/日期计算）；backend/app/services/action_set_service.py 与 treatment_plan_service.py（Gemini 草稿输出经 schema/ID 校验）。
+- 常见做法：部分 AI 风控或助手会让 LLM 直接输出风险分数、分类或状态决策。
+- 本作品的不同：ForeSail 将核心风险评分与分类、暴露映射、Incoterms 责任归属、合同/信用证硬期限处理及 Case 状态流转交给确定性代码。Gemini 负责文档抽取、摘要、相关性因子候选、动作候选和处置方案草稿；结构化输出经过关键字段、枚举、日期格式和已知 ID 的校验或清洗，并由用户确认。LLM 可以提出建议行动日期和方案估算成本，但不能改写已确认事实或核心风险决策。
+- 实际效果：核心风险结论可按相同事实输入复现并追溯到确定性规则；LLM 生成内容被限制在抽取、解释和候选草稿层，并通过代码约束与人工确认降低无效引用或越权决策风险。
+- 证据位置：backend/app/services/relevance_engine.py、risk_mapper.py、incoterm_rule_service.py、obligation_service.py、status_machine.py（确定性核心）；backend/app/services/action_set_service.py 与 treatment_plan_service.py（候选草稿的字段、枚举、日期格式与已知 ID 约束）。
 
 ### 2. Incoterms 风险归属引擎 + per-Case 座位自动判定
 
@@ -31,9 +31,9 @@
 - 实际效果：操作员不再『看到一堆新闻自己想办法』，而是直接得到一笔单可执行、带证据的处置建议。
 - 证据位置：前端 Recommended Action Board / Action Drafts / hazard attribution note。
 
-### 2. 切『风险决策与处置』层，与执行自动化竞品互补而非硬拼
+### 2. 逐层人审闸门：从抽取事实到确认动作再到处置方案
 
-- 常见做法：国内外贸数字化竞品主要做『执行自动化』——如九科信息偏对内 RPA、未斯科技做单证执行自动化，把托书/订舱/改单/单证等流程自动化。
-- 本作品的不同：ForeSail 不在执行层与它们硬拼，而是切它上面的『风险决策与处置』层：把外部事件转成本单的敞口 / 义务 / 期限 / 归属，再给出处置建议，可架在执行层之上、与其互补。
-- 实际效果：避开执行自动化红海，占住『外部风险决策』这个尚未被数字化覆盖的空位——一手用户访谈也印证『外贸系统数字化做得比较少』。
-- 证据位置：竞品分析基于对九科信息、未斯科技公开资料的调研；problem 中的用户访谈证据。
+- 常见做法：常见的一次性生成式交互会连续输出抽取结果、风险建议和处置方案，用户往往只能在结果末端整体接受或放弃，前置事实错误可能继续传递到后续决策。
+- 本作品的不同：ForeSail 将流程拆成 8 个有状态步骤，并设置多层人工确认：抽取字段可逐项接受、编辑或排除；高严重度字段冲突未解决时阻止事实确认；动作候选必须由用户选择并确认后，才可用于生成处置方案；已确认的动作集不能原位修改，后续方案只能引用其中已确认的动作。
+- 实际效果：已实现的机制效果是：高严重度冲突会阻断事实确认，未确认动作无法进入处置方案，已确认动作集不可原位修改，从而把自动生成内容保持在明确的人工审批边界内。该流程约束已有代码和自动化测试支持，但尚未通过真实用户测试量化效率提升或风险降低幅度。
+- 证据位置：backend/app/services/workflow_service.py（8 步状态与冲突阻断）；frontend/src/components/ExtractedFieldsReview.tsx（字段接受、编辑与排除）；backend/app/services/action_set_service.py（动作选择、确认及确认后不可变）；backend/app/services/treatment_plan_service.py（仅允许已确认动作进入处置方案）；backend/app/tests/test_mvp21_workflow.py、backend/app/tests/test_treatment_plans.py（流程约束测试）。

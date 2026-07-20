@@ -2,9 +2,9 @@
 
 ## 1. Google Gemini API（默认 LLM 提供方）
 
-- 具体能力或模型：gemini-3.1-flash-lite，用于长文本理解与受约束的结构化 JSON 输出；通过 Gemini 的 OpenAI 兼容端点（https://generativelanguage.googleapis.com/v1beta/openai）统一接入。当前 .env：LLM_PROVIDER=gemini，USE_LLM_EXTRACTION=true，LLM_FALLBACK_ENABLED=false。
+- 具体能力或模型：gemini-3.1-flash-lite，用于长文本理解与受约束的 JSON 对象输出；通过 Gemini 的 OpenAI 兼容端点（https://generativelanguage.googleapis.com/v1beta/openai）统一接入。当前 .env：LLM_PROVIDER=gemini，USE_LLM_EXTRACTION=true，LLM_FALLBACK_ENABLED=false。
 - 对应功能：贸易单据智能抽取——把合同 / 订舱确认 / 信用证的自由文本解析为可核验的结构化贸易要素。
-- 输入：单据解析后的全文文本（支持 TXT / DOCX / 文本 PDF）、允许抽取的 25 类字段白名单，以及约束返回格式的 JSON schema。
+- 输入：单据解析后的全文文本（支持 TXT / DOCX / 文本 PDF）、允许抽取的 25 类字段白名单，以及要求返回 JSON 对象的结构说明。
 - 处理：Gemini 在 temperature=0、response_format=json_object 的强约束下，抽取买卖方、商品、金额、币种、Incoterm、装运与交单期限、当事人角色等字段，并为每个字段附上证据文本与置信度；系统提示明确限定其只做事实抽取，不得推断风险等级、责任归属、冲突或审批结论。
 - 输出：带证据文本与置信度的结构化字段 JSON，进入前端逐字段 approve / edit / reject 的人工确认流程，成为整条风险链路的可信输入。
 - 核心程度：支撑
@@ -35,10 +35,10 @@
 - 证据位置：backend/app/services/llm_relevance_factor_service.py；backend/app/services/relevance_engine.py。
 ## 4. Google Gemini API（动作候选生成）
 
-- 具体能力或模型：gemini-3.1-flash-lite，用于在严格 JSON schema 下生成可执行 trade-risk action candidates。当前 .env：GEMINI_ACTION_MODEL=gemini-3.1-flash-lite，GEMINI_ACTION_TIMEOUT_SECONDS=60。
+- 具体能力或模型：gemini-3.1-flash-lite，用于生成 JSON 对象格式的 trade-risk action candidates；JSON 结构要求通过提示词提供，返回结果再接受关键字段、枚举、日期格式和已知 ID 的代码校验或清洗。当前 .env：GEMINI_ACTION_MODEL=gemini-3.1-flash-lite，GEMINI_ACTION_TIMEOUT_SECONDS=60。
 - 对应功能：Recommended Action Board / Actions——基于已确认事实、风险摘要、义务、信息缺口和 hazard，生成可编辑、可确认的动作候选。
 - 输入：已确认 case facts、relevance results、risk summary、obligations、information gaps、hazards 与 Incoterm responsibility。
-- 处理：Gemini 生成结构化 actions；系统用 schema、优先级枚举、responsible party 枚举、hazard/obligation/exposure ID 校验与清洗，禁止重新分类事件、改变 case 状态或编造法律结论。
+- 处理：Gemini 根据已确认事实和确定性风险结果生成动作候选；系统检查标题与负责人、优先级枚举及日期格式，清洗未知 hazard/obligation ID 和 exposure 引用，并规范责任方字段。候选动作可包含建议执行日期，但不能重新分类事件、改变 Case 状态或改写合同硬期限，且必须由用户选择、编辑和确认。
 - 输出：候选 action set，用户可选择、编辑并确认，确认后才进入后续处置方案。
 - 核心程度：支撑
 - 选型原因：动作草稿需要把确定性风险结果转成操作语言，Gemini 能提升可读性与可执行性，同时由代码校验约束。
@@ -46,22 +46,22 @@
 - 证据位置：backend/app/services/action_set_service.py；backend/app/services/structured_llm_service.py。
 ## 5. Google Gemini API（处置方案草稿生成）
 
-- 具体能力或模型：gemini-3.1-flash-lite，用于在严格 JSON schema 下生成 LOW_COST / BALANCED / MAX_PROTECTION 三类 treatment plans。当前 .env：GEMINI_PLAN_MODEL=gemini-3.1-flash-lite，GEMINI_PLAN_TIMEOUT_SECONDS=60。
+- 具体能力或模型：gemini-3.1-flash-lite，用于生成 LOW_COST、BALANCED、MAX_PROTECTION 三类 JSON 对象格式的 treatment plan 草稿；JSON 结构要求通过提示词提供，关键业务约束由代码复核。当前 .env：GEMINI_PLAN_MODEL=gemini-3.1-flash-lite，GEMINI_PLAN_TIMEOUT_SECONDS=60。
 - 对应功能：Treatment Plans——基于用户已确认的动作集合，生成三种处置方案、残余风险、审批角色与推荐方案。
 - 输入：已确认 case facts、已确认 actions、risk summary、obligations、information gaps、hazards 与 Incoterm responsibility。
-- 处理：Gemini 生成 exactly three plans；系统校验方案类型、唯一 recommended plan、linked action/gap/obligation ID 是否存在，禁止引用未确认动作或未知标识。
+- 处理：Gemini 基于已确认事实和已确认动作生成三类方案草稿；代码检查是否恰好包含三种方案类型、是否仅有一个推荐方案，以及 action、gap、obligation 引用是否来自已知 ID。方案可包含估算成本，但该数值属于待审批的草稿内容，不会改写已确认交易金额；方案仍需人工审核和选择。
 - 输出：可供审批与选择的三套处置方案，以及对应 residual risks 和 approval package 输入。
 - 核心程度：支撑
-- 选型原因：方案草稿是跨多个已确认动作的语言与结构化组织任务，适合由 Gemini 生成后由 deterministic/schema 校验守住边界。
+- 选型原因：方案草稿是跨多个已确认动作的语言与结构化组织任务，适合由 Gemini 生成后由代码复核关键业务约束守住边界。
 - 移除后的影响：移除后不能自动生成方案草稿，但不影响前置风险检测、责任归属、义务/期限计算和动作确认。
 - 证据位置：backend/app/services/treatment_plan_service.py；backend/app/services/structured_llm_service.py。
 
 ## 技术材料
 
-- 架构图：未提供
+- 架构图：[ForeSail 技术架构图](evidence/technical/architecture-diagram.md)
 - 代码仓库：https://github.com/jinyy20021018-design/ForeSail
 - 评审版本：5363a24aa5f1fe5e70bf1c0a5d1fb2079541a1de
-- 部署说明：后端 FastAPI（Python 3.10）部署于 Render（Root: backend, Start: uvicorn app.main:app），前端 React/Vite 部署于 Vercel（Build: npm run build, Output: dist）。免费演示配置可无付费 API 运行：外部事件默认 REAL 模式接 Open-Meteo/GDELT/RSS，LLM 抽取/摘要可关闭并回退确定性实现。
+- 部署说明：后端 FastAPI（Python 3.10）部署于 Render（Root: backend, Start: uvicorn app.main:app），前端 React/Vite 部署于 Vercel（Build: npm run build, Output: dist）。免费演示配置可无付费 API 运行：外部事件默认 REAL 模式组合带来源的可复现演示事件与 Open-Meteo/GDELT/RSS 等实时连接器；LLM 抽取/摘要可关闭并回退确定性实现。
 - 保密限制：未提供
 
 ### 核心代码或证据位置
@@ -70,8 +70,8 @@
 - backend/app/services/document_service.py — Gemini 文档抽取调用与 fallback
 - backend/app/services/agent_summary_service.py — Gemini Agent Run Summary
 - backend/app/services/llm_relevance_factor_service.py — Gemini 相关性因子候选提取 + 确定性校验
-- backend/app/services/action_set_service.py — Gemini 动作候选生成 + schema/ID 校验
-- backend/app/services/treatment_plan_service.py — Gemini 三方案生成 + schema/ID 校验
+- backend/app/services/action_set_service.py — Gemini 动作候选生成 + 关键字段/枚举/日期格式/已知 ID 校验或清洗
+- backend/app/services/treatment_plan_service.py — Gemini 三方案生成 + 方案数量/类型/已知 ID 约束校验
 - backend/app/services/relevance_engine.py — Case 相关性确定性打分引擎
 - backend/app/services/incoterm_rule_service.py — Incoterms 风险归属规则
 - backend/app/agents/monitoring_agent.py — Agent 编排层（不参与打分/日期计算）

@@ -89,8 +89,10 @@ def list_external_events_for_run(case_id: str, agent_run_id: str) -> list[dict]:
 
 def _connectors_for_mode(mode: str):
     if mode == "MOCK":
-        # Seed/offline mode uses only real, sourced curated events (no synthetic
-        # placeholder events), so pre-loaded cases open with genuine signals.
+        # Seed/offline mode uses deterministic curated scenario events derived
+        # from sourced real-world backgrounds. They are reproducible fixtures,
+        # not live observations. REAL mode also includes these fixtures alongside
+        # live connectors so the demo remains reproducible.
         return [CuratedEventConnector()]
     real_connectors = [
         CuratedEventConnector(),

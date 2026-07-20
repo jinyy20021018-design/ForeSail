@@ -7,7 +7,9 @@ frontend/dist/
 .DS_Store
 *.pyc
 *.docx
-!submission_packages/**/*.docx
+!submission_packages/368/evidence/demo-case-documents/contract.docx
+!submission_packages/368/evidence/demo-case-documents/booking_confirmation.docx
+!submission_packages/368/evidence/demo-case-documents/letter_of_credit.docx
 
 # Local runtime / debug artifacts
 backend/foresail.db
