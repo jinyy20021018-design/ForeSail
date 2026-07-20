@@ -7,6 +7,7 @@ frontend/dist/
 .DS_Store
 *.pyc
 *.docx
+!submission_packages/**/*.docx
 
 # Local runtime / debug artifacts
 backend/foresail.db
